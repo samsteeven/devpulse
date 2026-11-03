@@ -6,9 +6,10 @@ namespace DevPulse.ArchitectureTests;
 /// <summary>Les règles de dépendance du blueprint, vérifiées sur les assemblages compilés.</summary>
 public class LayerRulesTests
 {
-    public static readonly TheoryData<string> Services = new() { "Identity", "Registry", "Monitoring" };
+    /// <summary>Services organisés en Domain, Application, Infrastructure.</summary>
+    public static readonly TheoryData<string> Services = new() { "Identity", "Registry", "Monitoring", "Incident", "Alerting" };
 
-    private static readonly string[] AllServices = ["Identity", "Registry", "Monitoring"];
+    private static readonly string[] AllServices = ["Identity", "Registry", "Monitoring", "Incident", "Alerting", "AI"];
 
     // Forcer le chargement : une référence de projet non utilisée dans le code de test ne charge pas l'assemblage.
     private static readonly Assembly[] Loaded =
@@ -16,6 +17,9 @@ public class LayerRulesTests
         typeof(Identity.Infrastructure.IdentityDb).Assembly,
         typeof(Registry.Infrastructure.RegistryDb).Assembly,
         typeof(Monitoring.Infrastructure.MonitoringDb).Assembly,
+        typeof(Incident.Infrastructure.IncidentDb).Assembly,
+        typeof(Alerting.Infrastructure.AlertingDb).Assembly,
+        typeof(AI.Infrastructure.OpenAiCompatibleProvider).Assembly,
     ];
 
     private static Assembly Layer(string service, string layer)
@@ -49,9 +53,17 @@ public class LayerRulesTests
     [MemberData(nameof(Services))]
     public void Un_service_ne_depend_jamais_du_code_d_un_autre_service(string service)
     {
-        var others = AllServices.Where(s => s != service).Select(s => $"DevPulse.{s}").ToArray();
+        var others = AllServices.Where(s => s != service).Select(s => $"DevPulse.{s}.").ToArray();
         foreach (var layer in new[] { "Domain", "Application", "Infrastructure" })
             AssertNoDependency(Layer(service, layer), others);
+    }
+
+    [Fact]
+    public void Le_worker_IA_ne_connait_que_les_contrats()
+    {
+        AssertNoDependency(Layer("AI", "Application"), "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "RabbitMQ", "System.Net.Http",
+            "DevPulse.Identity.", "DevPulse.Registry.", "DevPulse.Monitoring.", "DevPulse.Incident.", "DevPulse.Alerting.");
+        AssertNoDependency(Layer("AI", "Infrastructure"), "DevPulse.Incident.", "DevPulse.Alerting.", "DevPulse.Monitoring.");
     }
 
     [Fact]

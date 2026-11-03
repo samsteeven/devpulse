@@ -20,6 +20,13 @@
     <Project Path="src/Services/AI/DevPulse.AI.Tests/DevPulse.AI.Tests.csproj" />
     <Project Path="src/Services/AI/DevPulse.AI.Worker/DevPulse.AI.Worker.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Alerting/">
+    <Project Path="src/Services/Alerting/DevPulse.Alerting.Api/DevPulse.Alerting.Api.csproj" />
+    <Project Path="src/Services/Alerting/DevPulse.Alerting.Application/DevPulse.Alerting.Application.csproj" />
+    <Project Path="src/Services/Alerting/DevPulse.Alerting.Domain/DevPulse.Alerting.Domain.csproj" />
+    <Project Path="src/Services/Alerting/DevPulse.Alerting.Infrastructure/DevPulse.Alerting.Infrastructure.csproj" />
+    <Project Path="src/Services/Alerting/DevPulse.Alerting.Tests/DevPulse.Alerting.Tests.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Identity/">
     <Project Path="src/Services/Identity/DevPulse.Identity.Api/DevPulse.Identity.Api.csproj" />
     <Project Path="src/Services/Identity/DevPulse.Identity.Application/DevPulse.Identity.Application.csproj" />

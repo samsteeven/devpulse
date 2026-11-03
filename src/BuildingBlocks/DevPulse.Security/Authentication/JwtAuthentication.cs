@@ -70,6 +70,18 @@ public static class JwtAuthenticationExtensions
                 rsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(jwt.Value.PublicKey), out _);
 
                 bearer.MapInboundClaims = false;
+
+                // Un navigateur ne peut pas poser d'en-tête Authorization sur une connexion WebSocket : pour les hubs
+                // SignalR, et seulement pour eux, le jeton est lu dans la requête (access_token).
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var token = context.Request.Query["access_token"].ToString();
+                        if (token.Length > 0 && context.HttpContext.Request.Path.StartsWithSegments("/hubs")) context.Token = token;
+                        return Task.CompletedTask;
+                    },
+                };
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidIssuer = jwt.Value.Issuer,

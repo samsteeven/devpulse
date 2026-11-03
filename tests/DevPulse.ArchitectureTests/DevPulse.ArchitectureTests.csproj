@@ -17,5 +17,8 @@
     <ProjectReference Include="..\..\src\Services\Registry\DevPulse.Registry.Infrastructure\DevPulse.Registry.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Services\Monitoring\DevPulse.Monitoring.Infrastructure\DevPulse.Monitoring.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\DevPulse.Messaging\DevPulse.Messaging.csproj" />
+    <ProjectReference Include="..\..\src\Services\Incident\DevPulse.Incident.Infrastructure\DevPulse.Incident.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Services\Alerting\DevPulse.Alerting.Infrastructure\DevPulse.Alerting.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Services\AI\DevPulse.AI.Infrastructure\DevPulse.AI.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

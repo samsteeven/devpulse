@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.Alerting.Application\DevPulse.Alerting.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Messaging\DevPulse.Messaging.csproj" />
+  </ItemGroup>
+</Project>

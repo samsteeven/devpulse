@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.Alerting.Infrastructure\DevPulse.Alerting.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Security\DevPulse.Security.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Observability\DevPulse.Observability.csproj" />
+  </ItemGroup>
+</Project>

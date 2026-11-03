@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.Alerting.Domain\DevPulse.Alerting.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Contracts\DevPulse.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Security\DevPulse.Security.csproj" />
+  </ItemGroup>
+</Project>

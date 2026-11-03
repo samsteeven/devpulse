@@ -87,8 +87,9 @@ services:
     environment:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/devpulse.json
       ENABLE_LOGS_GRAFANA: ${ENABLE_LOGS_GRAFANA:-false}
-      # Un compteur qui apparaît arrive déjà à 1 : sans zéro inséré à son début, increase() n'y voit aucune hausse,
-      # « Incidents ouverts (24 h) » affichait 0 et la première mise en file morte n'aurait déclenché aucune alerte.
+      # Un compteur qui apparaît arrive déjà à 1 : increase() ne voit pas cette première hausse. Ce zéro inséré au début
+      # de la série aide les taux ; les totaux du tableau de bord et des règles se calculent en plus par différence
+      # avec la valeur passée (voir infrastructure/observability).
       PROMETHEUS_EXTRA_ARGS: --enable-feature=created-timestamp-zero-ingestion
     tmpfs:
       # « exec » : Grafana met à jour son extension Prometheus dans /data et doit pouvoir l'exécuter. Avec l'option

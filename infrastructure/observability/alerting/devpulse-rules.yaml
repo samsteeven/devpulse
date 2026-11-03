@@ -59,7 +59,7 @@ groups:
             datasourceUid: "prometheus"
             model:
               refId: "A"
-              expr: "sum(increase(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}[10m])) or vector(0)"
+              expr: "sum(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}) - (sum(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"} offset 10m) or vector(0))"
               instant: true
               range: false
           - refId: "B"
@@ -158,7 +158,7 @@ groups:
             datasourceUid: "prometheus"
             model:
               refId: "A"
-              expr: "sum(increase(devpulse_alerts_deliveries_total{outcome=\"failed\"}[15m])) or vector(0)"
+              expr: "sum(devpulse_alerts_deliveries_total{outcome=\"failed\"}) - (sum(devpulse_alerts_deliveries_total{outcome=\"failed\"} offset 15m) or vector(0))"
               instant: true
               range: false
           - refId: "B"

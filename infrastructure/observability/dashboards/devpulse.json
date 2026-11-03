@@ -103,7 +103,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(devpulse_outages_detected_total[24h])))",
+          "expr": "round(sum(devpulse_outages_detected_total) - (sum(devpulse_outages_detected_total offset 24h) or vector(0)))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -405,7 +405,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(devpulse_incidents_opened_total[24h])))",
+          "expr": "round(sum(devpulse_incidents_opened_total) - (sum(devpulse_incidents_opened_total offset 24h) or vector(0)))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -585,7 +585,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(devpulse_alerts_deliveries_total{outcome=\"failed\"}[24h])))",
+          "expr": "round(sum(devpulse_alerts_deliveries_total{outcome=\"failed\"}) - (sum(devpulse_alerts_deliveries_total{outcome=\"failed\"} offset 24h) or vector(0)))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -775,7 +775,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}[1h])))",
+          "expr": "round(sum(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}) - (sum(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"} offset 1h) or vector(0)))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -955,7 +955,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "round(sum(increase(devpulse_messaging_publish_failures_total[1h])))",
+          "expr": "round(sum(devpulse_messaging_publish_failures_total) - (sum(devpulse_messaging_publish_failures_total offset 1h) or vector(0)))",
           "legendFormat": "",
           "refId": "A"
         }

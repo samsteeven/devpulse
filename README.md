@@ -9,7 +9,7 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 | Élément | Vérifié | Pas vérifié |
 |---|---|---|
 | Parcours complet | Playwright dans un vrai Chromium, à travers la passerelle et tous les services : panne de la fausse API → incident → webhook signé → analyse → prise en charge → fermeture automatique au retour | Une cible réelle sur Internet : la démonstration surveille une fausse API locale |
-| Délai de notification (objectif < 10 s) | **73 ms** mesurés en local entre la panne confirmée et la réception du webhook ; le test échoue au-delà de 10 s, en local et en CI | La détection elle-même prend deux intervalles (deux échecs consécutifs) : 30 à 60 s avec l'intervalle minimal |
+| Délai de notification (objectif < 10 s) | **41 à 73 ms** entre la panne confirmée et la réception du webhook (trois mesures : poste, deux exécutions de CI) ; le test échoue au-delà de 10 s | La détection elle-même prend deux intervalles (deux échecs consécutifs) : 30 à 60 s avec l'intervalle minimal |
 | Messagerie | Contre un vrai RabbitMQ : doublon sans effet, transaction annulée sans publication, reprise après délai, file morte, courtier injoignable. Retirer la déduplication fait échouer le test | Perte d'un nœud RabbitMQ ; un cluster |
 | Isolation entre organisations | Tests d'API sur PostgreSQL réel dans chaque service, hub temps réel compris, et test navigateur. Casses volontaires détectées (filtres Registry et Monitoring, groupes SignalR) | Audit de sécurité externe |
 | Sessions | Rotation du jeton de renouvellement, révocation de toute la famille en cas de rejeu, aucun jeton dans le stockage du navigateur (vérifié dans Chromium) | Rotation de la clé de signature (une seule clé RSA) |
@@ -17,7 +17,7 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 | Agent | Clé, révocation, silence détecté et incident ouvert, mesures réelles sous Windows ; sous Linux dans la CI | Un déploiement de l'agent sur une vraie flotte |
 | IA | Règles locales et fournisseur compatible OpenAI (requête, réponse, repli), contre un faux serveur HTTP | **Aucun appel à un vrai modèle** : pas de clé utilisée |
 | Images Docker | Construites et démarrées ensemble en CI, puis parcours navigateur et charge contre elles | Analyse de vulnérabilités des images |
-| Charge | k6, 20 utilisateurs pendant 30 s, en CI : résultats dans le résumé de chaque exécution | Une machine de production ; la montée en charge du worker de sondes |
+| Charge | k6 en CI, 20 utilisateurs pendant 30 s contre les conteneurs : environ 46 000 requêtes, 0 échec, P95 de 21 ms sur le runner GitHub (résultat dans le résumé de chaque exécution) | Une machine de production ; la montée en charge du worker de sondes |
 | AWS (Terraform) | `terraform validate` en CI | **Jamais appliqué** : aucun compte AWS utilisé, aucun `plan` calculé. Coût estimé dans [cout-aws.md](docs/architecture/cout-aws.md) |
 
 ## Architecture

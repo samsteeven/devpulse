@@ -56,12 +56,21 @@ public static class ObservabilityExtensions
                 .AddHttpClientInstrumentation()
                 .AddNpgsql()
                 .AddSource("DevPulse.Messaging"))
-            .WithMetrics(metrics => metrics
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddMeter("System.Runtime")
-                // Mesures métier : DevPulse.Messaging, .Monitoring, .Incident, .Alerting.
-                .AddMeter("DevPulse.*"));
+            .WithMetrics(metrics =>
+            {
+                metrics
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation()
+                    .AddMeter("System.Runtime")
+                    // Mesures métier : DevPulse.Messaging, .Monitoring, .Incident, .Alerting.
+                    .AddMeter("DevPulse.*");
+
+                // Vers Application Insights seul, chaque série coûte de l'ingestion : sous le plafond quotidien du crédit
+                // étudiant, les mesures techniques (runtime, client HTTP, Kestrel) le feraient atteindre chaque jour et
+                // rendraient les alertes aveugles. On ne garde que les mesures métier et la durée des requêtes HTTP.
+                if (azure && !otlp)
+                    metrics.AddView(instrument => KeptForAzure(instrument) ? null : MetricStreamConfiguration.Drop);
+            });
 
         if (otlp) telemetry.UseOtlpExporter();
         if (azure)
@@ -73,4 +82,7 @@ public static class ObservabilityExtensions
 
         return builder;
     }
+
+    public static bool KeptForAzure(System.Diagnostics.Metrics.Instrument instrument) =>
+        instrument.Meter.Name.StartsWith("DevPulse.", StringComparison.Ordinal) || instrument.Name == "http.server.request.duration";
 }

@@ -26,3 +26,13 @@ output "log_analytics_workspace_id" {
   description = "Identifiant de l'espace de travail, pour `az monitor log-analytics query --workspace`."
   value       = azurerm_log_analytics_workspace.this.workspace_id
 }
+
+output "application_insights_name" {
+  description = "Ressource Application Insights (null si enable_application_insights = false). Portail : Application Insights > ce nom > Application map, Transaction search, Logs (tables classiques customMetrics, requests…) ; ou l'espace Log Analytics > Logs (tables AppMetrics, AppRequests…)."
+  value       = try(azurerm_application_insights.this[0].name, null)
+}
+
+output "platform_alert_rules" {
+  description = "Noms des règles d'alerte de la plateforme (Monitor > Alerts > Alert rules), vide si enable_platform_alerts = false."
+  value       = [for rule in azurerm_monitor_scheduled_query_rules_alert_v2.platform : rule.name]
+}

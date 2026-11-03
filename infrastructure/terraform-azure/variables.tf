@@ -145,6 +145,53 @@ variable "log_retention_days" {
   }
 }
 
+# --- Supervision ---
+
+variable "enable_application_insights" {
+  description = "Crée Application Insights (rattaché à l'espace Log Analytics) et donne sa chaîne de connexion aux services .NET, qui y exportent traces, métriques et journaux."
+  type        = bool
+  default     = true
+}
+
+variable "app_insights_daily_cap_gb" {
+  description = "Plafond quotidien d'Application Insights, en Go. Le plafond effectif est le plus petit de celui-ci et de daily_quota_gb ; plus bas que daily_quota_gb, il laisse de la place aux journaux des conteneurs. Au-delà, plus de télémétrie jusqu'au lendemain, et les règles d'alerte deviennent aveugles."
+  type        = number
+  default     = 0.1
+
+  validation {
+    condition     = var.app_insights_daily_cap_gb > 0
+    error_message = "app_insights_daily_cap_gb doit être positif."
+  }
+}
+
+variable "app_insights_sampling_percentage" {
+  description = "Échantillonnage à l'ingestion d'Application Insights, en pourcentage (100 : tout garder). Porte sur les traces et les journaux, jamais sur les métriques : les règles d'alerte n'en dépendent pas. Les services échantillonnent déjà leurs traces à la source (voir README)."
+  type        = number
+  default     = 100
+
+  validation {
+    condition     = var.app_insights_sampling_percentage > 0 && var.app_insights_sampling_percentage <= 100
+    error_message = "app_insights_sampling_percentage : entre 0 (exclu) et 100."
+  }
+}
+
+variable "enable_platform_alerts" {
+  description = "Crée les cinq règles d'alerte de la plateforme (requêtes sur les métriques d'Application Insights) et un groupe d'actions qui écrit à budget_alert_email. Demande enable_application_insights."
+  type        = bool
+  default     = true
+}
+
+variable "platform_alert_frequency_minutes" {
+  description = "Fréquence d'évaluation des règles d'alerte, en minutes : 5, 10 ou 15. Le prix d'une règle dépend de sa fréquence (1,50 $, 1 $ ou 0,50 $ par mois, voir docs/architecture/cout-azure.md)."
+  type        = number
+  default     = 5
+
+  validation {
+    condition     = contains([5, 10, 15], var.platform_alert_frequency_minutes)
+    error_message = "platform_alert_frequency_minutes : 5, 10 ou 15."
+  }
+}
+
 # --- PostgreSQL ---
 
 variable "db_version" {
@@ -305,7 +352,7 @@ variable "monthly_budget" {
 }
 
 variable "budget_alert_email" {
-  description = "Adresse qui reçoit les alertes du budget (50 %, 80 %, 100 % constatés, 100 % prévus)."
+  description = "Adresse qui reçoit les alertes du budget (50 %, 80 %, 100 % constatés, 100 % prévus) et celles des règles de supervision (enable_platform_alerts)."
   type        = string
 
   validation {

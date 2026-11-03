@@ -3,7 +3,8 @@
 
 locals {
   # Mêmes valeurs que l'ancre x-app-env de docker-compose.yml, sauf OTEL_EXPORTER_OTLP_ENDPOINT (pas de collecteur
-  # ici) et RabbitMQ, donné seulement aux services qui l'utilisent (voir rabbitmq_env).
+  # ici : Application Insights le remplace, voir app_insights_env) et RabbitMQ, donné seulement aux services qui
+  # l'utilisent (voir rabbitmq_env).
   common_env = {
     ASPNETCORE_ENVIRONMENT = "Production"
     DOTNET_ENVIRONMENT     = "Production"
@@ -82,31 +83,53 @@ locals {
     "ai-worker" = merge(local.common_env, local.rabbitmq_env, local.ai_env)
   }
 
+  # Export vers Application Insights (DevPulse.Observability) : traces, métriques et journaux partent dès que la
+  # variable est posée. Tous les services .NET la reçoivent, pas web (nginx) ni rabbitmq.
+  app_insights_env = {
+    for key, secret in { APPLICATIONINSIGHTS_CONNECTION_STRING = "appinsights-connection" } : key => secret
+    if var.enable_application_insights
+  }
+
   # Variable d'environnement => nom du secret Container Apps (valeurs dans secrets.tf).
   secret_env = {
     "web"     = {}
-    "gateway" = {}
-    "identity" = {
-      ConnectionStrings__Database = "db-identity"
-      Jwt__PrivateKey             = "jwt-private-key"
-    }
-    "registry" = {
-      ConnectionStrings__Database = "db-registry"
-      InternalApi__Key            = "internal-api-key"
-    }
-    "monitoring-api" = {
-      ConnectionStrings__Database = "db-monitoring"
-      RabbitMq__Password          = "rabbitmq-password"
-    }
-    "monitoring-worker" = {
-      ConnectionStrings__Database = "db-monitoring"
-      InternalApi__Key            = "internal-api-key"
-      RabbitMq__Password          = "rabbitmq-password"
-    }
-    "incident" = {
-      ConnectionStrings__Database = "db-incident"
-      RabbitMq__Password          = "rabbitmq-password"
-    }
+    "gateway" = local.app_insights_env
+    "identity" = merge(
+      {
+        ConnectionStrings__Database = "db-identity"
+        Jwt__PrivateKey             = "jwt-private-key"
+      },
+      local.app_insights_env,
+    )
+    "registry" = merge(
+      {
+        ConnectionStrings__Database = "db-registry"
+        InternalApi__Key            = "internal-api-key"
+      },
+      local.app_insights_env,
+    )
+    "monitoring-api" = merge(
+      {
+        ConnectionStrings__Database = "db-monitoring"
+        RabbitMq__Password          = "rabbitmq-password"
+      },
+      local.app_insights_env,
+    )
+    "monitoring-worker" = merge(
+      {
+        ConnectionStrings__Database = "db-monitoring"
+        InternalApi__Key            = "internal-api-key"
+        RabbitMq__Password          = "rabbitmq-password"
+      },
+      local.app_insights_env,
+    )
+    "incident" = merge(
+      {
+        ConnectionStrings__Database = "db-incident"
+        RabbitMq__Password          = "rabbitmq-password"
+      },
+      local.app_insights_env,
+    )
     # Sans Redis__ConnectionString, alerting n'a pas de fond de panier SignalR : correct avec un seul réplica.
     "alerting" = merge(
       {
@@ -114,10 +137,12 @@ locals {
         RabbitMq__Password          = "rabbitmq-password"
       },
       { for key, secret in { Redis__ConnectionString = "redis-connection" } : key => secret if var.enable_redis },
+      local.app_insights_env,
     )
     "ai-worker" = merge(
       { RabbitMq__Password = "rabbitmq-password" },
       { for key, secret in { Ai__ApiKey = "ai-api-key" } : key => secret if local.ai_api_key_enabled },
+      local.app_insights_env,
     )
   }
 

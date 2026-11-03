@@ -23,6 +23,14 @@ enable_vnet = true
 # Plafond d'ingestion des journaux, en Go par jour.
 daily_quota_gb = 0.15
 
+# Supervision : Application Insights (plafond propre, au plus daily_quota_gb) et cinq règles d'alerte envoyées à
+# budget_alert_email. Une règle coûte 1,50 $/mois évaluée toutes les 5 min, 0,50 $ toutes les 15 min.
+# enable_application_insights      = true
+# app_insights_daily_cap_gb        = 0.1
+# app_insights_sampling_percentage = 100
+# enable_platform_alerts           = true
+# platform_alert_frequency_minutes = 15
+
 # Tout réveiller plus vite (pas de démarrage à froid), au prix du tarif actif ou inactif 24 h/24 :
 # replicas = {
 #   "web"     = { min = 1, max = 1 }

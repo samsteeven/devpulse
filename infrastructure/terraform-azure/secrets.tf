@@ -71,6 +71,8 @@ locals {
     "redis-connection"  = { enabled = var.enable_redis, value = local.redis_connection_string }
     "ai-api-key"        = { enabled = local.ai_api_key_enabled, value = var.ai_api_key }
     "registry-password" = { enabled = local.registry_auth, value = var.registry_password }
+    # Contient la clé d'instrumentation : quiconque la lit peut écrire dans Application Insights.
+    "appinsights-connection" = { enabled = var.enable_application_insights, value = local.app_insights_connection_string }
   }
 
   secret_values = merge(

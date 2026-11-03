@@ -20,7 +20,7 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 | Images Docker | Construites et démarrées ensemble en CI, puis parcours navigateur et charge contre elles | Analyse de vulnérabilités des images |
 | Charge | k6 en CI, 20 utilisateurs pendant 30 s contre les conteneurs : environ 46 000 requêtes, 0 échec, P95 de 21 ms sur le runner GitHub (résultat dans le résumé de chaque exécution) | Une machine de production ; la montée en charge du worker de sondes |
 | AWS (Terraform) | `terraform validate` en CI | **Jamais appliqué** : aucun compte AWS utilisé, aucun `plan` calculé. Coût estimé dans [cout-aws.md](docs/architecture/cout-aws.md) |
-| Azure (Terraform, Container Apps) | `terraform validate` en CI ; front corrigé pour l'aiguillage par en-tête `Host` de Container Apps | **Jamais appliqué**. Pensé pour un abonnement Azure for Students : environ 1 $ par démonstration détruite le soir, environ 105 $ par mois si tout reste allumé ([cout-azure.md](docs/architecture/cout-azure.md)) |
+| Azure (Terraform, Container Apps) | `terraform validate` en CI ; front corrigé pour l'aiguillage par en-tête `Host` de Container Apps | **Jamais appliqué**. Pensé pour un abonnement Azure for Students : environ 1 $ par démonstration détruite le soir, environ 113 $ par mois si tout reste allumé, supervision comprise ([cout-azure.md](docs/architecture/cout-azure.md)) |
 
 ## Architecture
 

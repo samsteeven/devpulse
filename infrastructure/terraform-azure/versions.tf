@@ -31,7 +31,20 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    # Azure crée de lui-même, avec Application Insights, une règle de détection intelligente « Failure Anomalies »
+    # (et son groupe d'actions) qui écrit aux propriétaires de l'abonnement. Elle est désactivée à la création : les
+    # règles d'observability.tf la remplacent.
+    application_insights {
+      disable_generated_rule = true
+    }
+
+    # Ces ressources créées par Azure ne sont pas dans l'état Terraform : sans cela, `terraform destroy` refuserait de
+    # supprimer le groupe de ressources qui les contient. Le groupe ne sert qu'à ce déploiement.
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 
   # Vide : abonnement de ARM_SUBSCRIPTION_ID, sinon abonnement par défaut d'Azure CLI (`az account set`).
   subscription_id = var.subscription_id
@@ -47,6 +60,7 @@ locals {
   resource_providers = [
     "Microsoft.App",                 # Container Apps
     "Microsoft.OperationalInsights", # Log Analytics
+    "Microsoft.Insights",            # Application Insights, groupe d'actions, règles d'alerte
     "Microsoft.DBforPostgreSQL",     # PostgreSQL Flexible Server
     "Microsoft.Network",             # réseau virtuel, zone DNS privée
     "Microsoft.Consumption",         # budget

@@ -86,6 +86,10 @@ services:
     restart: unless-stopped
     environment:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/devpulse.json
+      # Depuis Grafana 13, Prometheus est une extension téléchargée au démarrage dans /data. Avec /data en mémoire,
+      # elle manquait et tous les panneaux affichaient « Datasource prometheus was not found » : installation
+      # synchrone, avant que Grafana serve la première page.
+      GF_PLUGINS_PREINSTALL_SYNC: prometheus
     tmpfs:
       - /data:rw,mode=1777,size=1g
     volumes:

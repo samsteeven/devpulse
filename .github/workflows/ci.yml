@@ -143,6 +143,13 @@ jobs:
           for service in api-gateway identity-service incident-service alerting-service monitoring-worker ai-worker; do
             echo "$services" | grep -qw "$service" || { echo "AUCUNE TRACE : $service"; missing=1; }
           done
+          # Une requête comme celle d'un panneau, par Grafana : Prometheus peut recevoir les métriques alors que
+          # Grafana ne sait pas l'interroger (extension absente, constaté une fois).
+          grafana_query=$(curl -s -o /tmp/grafana-query.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -d '{"from":"now-1h","to":"now","queries":[{"refId":"A","datasource":{"type":"prometheus","uid":"prometheus"},"expr":"sum(devpulse_checks_total)","instant":true}]}' \
+            http://localhost:3000/api/ds/query)
+          echo "Requête par Grafana : HTTP $grafana_query $(head -c 300 /tmp/grafana-query.json)"
+          [ "$grafana_query" = "200" ] || missing=1
           title=$(curl -sf http://localhost:3000/api/dashboards/uid/devpulse | jq -r '.dashboard.title' || curl -sf -u admin:admin http://localhost:3000/api/dashboards/uid/devpulse | jq -r '.dashboard.title')
           echo "Tableau de bord Grafana : $title"
           [ "$title" = "DevPulse : plateforme" ] || missing=1

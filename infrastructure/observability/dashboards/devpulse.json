@@ -103,7 +103,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(devpulse_outages_detected_total[24h]))",
+          "expr": "round(sum(increase(devpulse_outages_detected_total[24h])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -123,7 +123,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 1,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -405,7 +405,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(devpulse_incidents_opened_total[24h]))",
+          "expr": "round(sum(increase(devpulse_incidents_opened_total[24h])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -425,7 +425,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 1,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -585,7 +585,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(devpulse_alerts_deliveries_total{outcome=\"failed\"}[24h]))",
+          "expr": "round(sum(increase(devpulse_alerts_deliveries_total{outcome=\"failed\"}[24h])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -605,7 +605,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 1,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -775,7 +775,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}[1h]))",
+          "expr": "round(sum(increase(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}[1h])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -795,7 +795,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 1,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -955,7 +955,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(devpulse_messaging_publish_failures_total[1h]))",
+          "expr": "round(sum(increase(devpulse_messaging_publish_failures_total[1h])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -975,7 +975,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 1,
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [

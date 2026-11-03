@@ -130,12 +130,12 @@ g.on('response', async (response) => {
   const body = await response.text().catch(() => '')
   if (response.status() >= 400 || body.includes('"error"')) log(`Grafana ${response.status()} : ${body.slice(0, 600)}`)
 })
-await g.goto(`${GRAFANA}/d/devpulse?orgId=1&from=now-10m&to=now&theme=dark&kiosk`)
+await g.goto(`${GRAFANA}/d/devpulse?orgId=1&from=now-5m&to=now&theme=dark&kiosk`)
 if (g.url().includes('/login')) {
   await g.getByLabel(/user/i).fill('admin')
   await g.getByLabel(/password/i).fill('admin')
   await g.getByRole('button', { name: /log in/i }).click()
-  await g.goto(`${GRAFANA}/d/devpulse?orgId=1&from=now-10m&to=now&theme=dark&kiosk`)
+  await g.goto(`${GRAFANA}/d/devpulse?orgId=1&from=now-5m&to=now&theme=dark&kiosk`)
 }
 await g.getByText('Vérifications par minute').waitFor()
 await sleep(8000) // rendu des panneaux

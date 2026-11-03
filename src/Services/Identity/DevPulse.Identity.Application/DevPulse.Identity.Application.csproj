@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.Identity.Domain\DevPulse.Identity.Domain.csproj" />
+  </ItemGroup>
+</Project>

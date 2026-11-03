@@ -1,0 +1,42 @@
+<Solution>
+  <Folder Name="/infrastructure/" />
+  <Folder Name="/infrastructure/demo/">
+    <Project Path="infrastructure/demo/DevPulse.DemoTarget/DevPulse.DemoTarget.csproj" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/DevPulse.Contracts/DevPulse.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/DevPulse.Observability/DevPulse.Observability.csproj" />
+    <Project Path="src/BuildingBlocks/DevPulse.Security/DevPulse.Security.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/">
+    <Project Path="src/Gateway/DevPulse.Gateway/DevPulse.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Identity/">
+    <Project Path="src/Services/Identity/DevPulse.Identity.Api/DevPulse.Identity.Api.csproj" />
+    <Project Path="src/Services/Identity/DevPulse.Identity.Application/DevPulse.Identity.Application.csproj" />
+    <Project Path="src/Services/Identity/DevPulse.Identity.Domain/DevPulse.Identity.Domain.csproj" />
+    <Project Path="src/Services/Identity/DevPulse.Identity.Infrastructure/DevPulse.Identity.Infrastructure.csproj" />
+    <Project Path="src/Services/Identity/DevPulse.Identity.Tests/DevPulse.Identity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Monitoring/">
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Api/DevPulse.Monitoring.Api.csproj" />
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Application/DevPulse.Monitoring.Application.csproj" />
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Domain/DevPulse.Monitoring.Domain.csproj" />
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Infrastructure/DevPulse.Monitoring.Infrastructure.csproj" />
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Tests/DevPulse.Monitoring.Tests.csproj" />
+    <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Worker/DevPulse.Monitoring.Worker.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Registry/">
+    <Project Path="src/Services/Registry/DevPulse.Registry.Api/DevPulse.Registry.Api.csproj" />
+    <Project Path="src/Services/Registry/DevPulse.Registry.Application/DevPulse.Registry.Application.csproj" />
+    <Project Path="src/Services/Registry/DevPulse.Registry.Domain/DevPulse.Registry.Domain.csproj" />
+    <Project Path="src/Services/Registry/DevPulse.Registry.Infrastructure/DevPulse.Registry.Infrastructure.csproj" />
+    <Project Path="src/Services/Registry/DevPulse.Registry.Tests/DevPulse.Registry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DevPulse.ArchitectureTests/DevPulse.ArchitectureTests.csproj" />
+    <Project Path="tests/DevPulse.IntegrationTests/DevPulse.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

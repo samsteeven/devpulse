@@ -1,0 +1,78 @@
+name: devpulse
+
+# Infrastructure locale. Tous les ports sont publiés sur 127.0.0.1 uniquement.
+# Les variables « ?: » font échouer le démarrage plutôt que de partir sans mot de passe.
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    container_name: devpulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Lancer infrastructure/scripts/make-env.ps1}
+      POSTGRES_DB: postgres
+    ports:
+      # 5432 refusé par Windows sur certains postes : le port publié se règle dans .env.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Vise la dernière base créée par le script d'initialisation : sain seulement quand elle existe vraiment.
+      test: ["CMD-SHELL", "psql -U \"$${POSTGRES_USER}\" -d devpulse_alerting -c 'select 1' > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.3.7-management-alpine
+    container_name: devpulse-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-devpulse}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Lancer infrastructure/scripts/make-env.ps1}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4.12-alpine
+    container_name: devpulse-redis
+    restart: unless-stopped
+    # Le mot de passe vient de l'environnement du conteneur : il n'est pas écrit dans sa commande de démarrage.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Lancer infrastructure/scripts/make-env.ps1}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Lancer infrastructure/scripts/make-env.ps1}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    container_name: devpulse-otel
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./infrastructure/docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:

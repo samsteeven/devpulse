@@ -1,0 +1,38 @@
+# Secrets locaux
+.env
+.env.*
+!.env.example
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Journaux et exécution locale
+logs/
+*.log
+.run/
+
+# Éditeurs et systèmes
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

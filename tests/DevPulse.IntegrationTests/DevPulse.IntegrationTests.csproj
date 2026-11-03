@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gateway\DevPulse.Gateway\DevPulse.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\DevPulse.Contracts\DevPulse.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\DevPulse.Security\DevPulse.Security.csproj" />
+  </ItemGroup>
+</Project>

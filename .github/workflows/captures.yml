@@ -54,7 +54,7 @@ jobs:
           npm run captures
 
       - name: Diagnostic Grafana
-        if: always()
+        if: failure()
         run: |
           docker exec devpulse-observability sh -c 'df -h /data; ls -la /data/grafana /data/grafana/plugins 2>&1 | head -40' || true
           docker logs devpulse-observability 2>&1 | grep -iE "plugin|prometheus|error" | grep -viE "level=(debug)" | head -80 || true

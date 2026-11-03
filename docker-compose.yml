@@ -86,13 +86,12 @@ services:
     restart: unless-stopped
     environment:
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/devpulse.json
-      # Depuis Grafana 13, Prometheus est une extension téléchargée au démarrage dans /data. Avec /data en mémoire,
-      # elle manquait et tous les panneaux affichaient « Datasource prometheus was not found » : installation
-      # synchrone, avant que Grafana serve la première page.
-      GF_PLUGINS_PREINSTALL_SYNC: prometheus
       ENABLE_LOGS_GRAFANA: ${ENABLE_LOGS_GRAFANA:-false}
     tmpfs:
-      - /data:rw,mode=1777,size=1g
+      # « exec » : Grafana met à jour son extension Prometheus dans /data et doit pouvoir l'exécuter. Avec l'option
+      # par défaut de Docker (noexec), elle ne démarrait pas (« permission denied ») et chaque panneau affichait
+      # « Datasource prometheus was not found ».
+      - /data:rw,exec,mode=1777,size=1g
     volumes:
       - ./infrastructure/observability/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/custom:ro
       - ./infrastructure/observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro

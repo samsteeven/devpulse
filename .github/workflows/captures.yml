@@ -20,6 +20,7 @@ jobs:
         run: |
           ./infrastructure/scripts/make-env.ps1
           Add-Content .env 'ALLOW_PRIVATE_TARGETS=true'
+          Add-Content .env 'ENABLE_LOGS_GRAFANA=true'
 
       - name: Démarrage de la plateforme
         run: |
@@ -51,6 +52,12 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           npm run captures
+
+      - name: Diagnostic Grafana
+        if: always()
+        run: |
+          docker exec devpulse-observability sh -c 'df -h /data; ls -la /data/grafana /data/grafana/plugins 2>&1 | head -40' || true
+          docker logs devpulse-observability 2>&1 | grep -iE "plugin|prometheus|error" | grep -viE "level=(debug)" | head -80 || true
 
       - name: Journaux des services
         if: failure()

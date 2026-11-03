@@ -90,6 +90,7 @@ services:
       # elle manquait et tous les panneaux affichaient « Datasource prometheus was not found » : installation
       # synchrone, avant que Grafana serve la première page.
       GF_PLUGINS_PREINSTALL_SYNC: prometheus
+      ENABLE_LOGS_GRAFANA: ${ENABLE_LOGS_GRAFANA:-false}
     tmpfs:
       - /data:rw,mode=1777,size=1g
     volumes:

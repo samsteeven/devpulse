@@ -44,7 +44,7 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 - **Incident ouvre l'incident, Alerting ne fait que prévenir** ([ADR-012](docs/adr/README.md)) ; le temps réel est un canal d'Alerting ([ADR-013](docs/adr/README.md)).
 - **Fermé par défaut** : toute route exige un jeton rattaché à une organisation, sauf `[AllowAnonymous]` explicite.
 
-Décisions : [`docs/adr`](docs/adr/README.md). Événements et garanties : [`docs/events`](docs/events/README.md). Corrections du cahier des charges : [`docs/architecture/ecarts-blueprint.md`](docs/architecture/ecarts-blueprint.md). Déploiement AWS : [`infrastructure/terraform`](infrastructure/terraform/README.md).
+Décisions : [`docs/adr`](docs/adr/README.md). Événements et garanties : [`docs/events`](docs/events/README.md). Corrections du cahier des charges : [`docs/architecture/ecarts-blueprint.md`](docs/architecture/ecarts-blueprint.md). Déploiement AWS : [`infrastructure/terraform`](infrastructure/terraform/README.md). Webhooks, agent et API pour un système extérieur : [`docs/integrations`](docs/integrations/README.md).
 
 ## Démarrer
 
@@ -72,11 +72,11 @@ curl -X POST http://localhost:5020/mode/down    # ou slow, ok
 curl http://localhost:5020/webhooks/essai       # alertes reçues, avec leur heure de réception
 ```
 
-`ALLOW_PRIVATE_TARGETS=true` autorise ces adresses locales. **Il doit rester à `false` partout ailleurs.**
+`ALLOW_PRIVATE_TARGETS=true` autorise ces adresses locales. **Il doit rester à `false` partout ailleurs.** Les variables facultatives sont décrites dans [`.env.example`](.env.example). En mode développement, chaque API publie son Swagger : `http://localhost:5010/swagger` (Identity) à `5014` (Alerting).
 
 **Analyse par un modèle de langage** : `AI_PROVIDER=Llm`, `AI_BASE_URL` (par exemple `https://api.openai.com/v1/` ou `http://localhost:11434/v1/` pour Ollama), `AI_MODEL`, `AI_API_KEY` dans `.env`. Sans cela, les règles locales répondent.
 
-**Agent** : créer un agent dans la page « Agents », puis sur la machine à surveiller :
+**Agent** (détails dans [`docs/integrations`](docs/integrations/README.md#agent)) : créer un agent dans la page « Agents », puis sur la machine à surveiller :
 
 ```bash
 DevPulse__Url=https://devpulse.example.com DevPulse__AgentKey=dpa_… dotnet DevPulse.Agent.dll
@@ -144,7 +144,7 @@ infrastructure/docker/           image .NET commune, initialisation PostgreSQL, 
 infrastructure/terraform/        AWS ECS Fargate, RDS, Amazon MQ, ElastiCache
 infrastructure/demo/             fausse API à surveiller et boîte à webhooks
 tests/                           architecture, messagerie, passerelle, agent, parcours navigateur, charge (k6)
-docs/                            ADR, événements, écarts avec le cahier des charges, coût AWS
+docs/                            ADR, événements, intégrations, écarts avec le cahier des charges, coût AWS
 ```
 
 ## Licence

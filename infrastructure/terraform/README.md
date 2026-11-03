@@ -2,7 +2,7 @@
 
 Mise en œuvre de l'[ADR-008](../../docs/adr/README.md) : la plateforme complète sur ECS Fargate, région Paris (`eu-west-3`) par défaut.
 
-**Ce code n'a jamais été exécuté.** Personne n'a lancé `terraform plan`, encore moins `apply`. Terraform n'était pas installé sur le poste où il a été écrit : même `terraform validate` n'a pas tourné. Il est prévu en CI (`fmt -check`, `init -backend=false`, `validate`), ce qui ne vérifie que la syntaxe et les types, pas le comportement chez AWS.
+**Ce code n'a jamais été appliqué.** Personne n'a lancé `terraform plan`, encore moins `apply`. La CI exécute `fmt -check`, `init -backend=false` et `validate`, qui passent : cela vérifie la syntaxe, les types et les références, pas le comportement chez AWS.
 
 ## Ce qui est vérifié, et ce qui ne l'est pas
 
@@ -10,7 +10,7 @@ Mise en œuvre de l'[ADR-008](../../docs/adr/README.md) : la plateforme complèt
 |---|---|---|
 | Noms des variables d'environnement | Relus dans le code des services (`RabbitMqOptions`, `AiOptions`, `JwtOptions`, configuration YARP et `ForwardedHeaders` de la passerelle) | Que chaque service démarre avec exactement cette configuration |
 | Format des clés JWT | La dérivation PEM vers base64 du DER (expression régulière de `secrets.tf`) a été rejouée en .NET sur des PEM PKCS#8 et SPKI : résultat identique à `ExportPkcs8PrivateKey` / `ExportSubjectPublicKeyInfo`. Un bloc `check` le contrôle à chaque plan | Sur une clé produite par le fournisseur `tls` lui-même |
-| Arguments des ressources | Relus dans la documentation du fournisseur `hashicorp/aws` (branche principale, novembre 2026) pour ElastiCache, Amazon MQ, ECS, RDS, ALB | `terraform validate` ; un vrai `plan` |
+| Arguments des ressources | `terraform validate` en CI ; relus dans la documentation du fournisseur `hashicorp/aws` pour ElastiCache, Amazon MQ, ECS, RDS, ALB | Un vrai `plan` : des valeurs refusées seulement par l'API AWS (version de Valkey, jeton d'authentification) restent possibles |
 | Version RabbitMQ | Documentation Amazon MQ : 3.13 sur mq.t3, 4.2 seulement sur mq.m7g | Création réelle du broker |
 | Coût | Prix unitaires lus dans l'API de prix AWS : [`docs/architecture/cout-aws.md`](../../docs/architecture/cout-aws.md) | Une facture réelle |
 | Tout le reste (réseau, IAM, déploiement, WebSocket à travers l'ALB) | Rien | Tout |
@@ -44,7 +44,7 @@ Mise en œuvre de l'[ADR-008](../../docs/adr/README.md) : la plateforme complèt
 - **Clés et mots de passe dans l'état Terraform.** Ils sont générés par Terraform, donc présents en clair dans l'état : il doit être chiffré et d'accès restreint. Un exemple de backend S3 avec KMS est en commentaire dans `versions.tf`. L'alternative (secrets créés hors Terraform, référencés par ARN) retire ce risque mais ajoute une étape manuelle.
 - **Pas de haute disponibilité.** RDS mono-zone, broker en instance unique, un nœud Valkey, une tâche par service. Une maintenance du broker interrompt les échanges ; l'outbox des services garde les messages en base.
 - **Pas de `readonlyRootFilesystem`.** ASP.NET Core écrit dans `/tmp`, et Fargate ne monte pas de tmpfs.
-- **Pas de contrôle de santé dans les conteneurs.** Seuls gateway (`/health/live`) et web (`/`) sont contrôlés, par l'ALB. Les API internes ne sont relancées que si leur processus s'arrête : les images ne contiennent peut-être pas `curl`.
+- **Pas de contrôle de santé dans les conteneurs.** Seuls gateway (`/health/live`) et web (`/`) sont contrôlés, par l'ALB. Les API internes ne sont relancées que si leur processus s'arrête : les images (aspnet « chiseled ») n'ont ni shell ni `curl`.
 - **monitoring-worker ne migre pas.** S'il démarre avant que monitoring-api ait créé le schéma, il échoue et ECS le relance.
 - **Pas de points de terminaison VPC.** ECR, Secrets Manager et CloudWatch sont joints par Internet (IP publique ou NAT).
 - **Tags ECR immuables.** `image_tag` doit être unique par version (SHA du commit) ; pousser deux fois `latest` échoue.

@@ -13,5 +13,6 @@ builder.Services.AddDevPulseMessaging("monitoring-worker").AddOutbox<MonitoringD
 builder.Services.AddHostedService<RegistrySyncService>();
 builder.Services.AddHostedService<CheckSchedulerService>();
 builder.Services.AddHostedService<RetentionService>();
+builder.Services.AddHostedService<AgentWatchService>();
 
 builder.Build().Run();

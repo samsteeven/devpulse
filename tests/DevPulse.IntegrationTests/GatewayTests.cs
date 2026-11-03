@@ -28,6 +28,8 @@ public sealed class GatewayFixture : IAsyncLifetime
         var identity = await StartBackendAsync("identity");
         var registry = await StartBackendAsync("registry");
         var monitoring = await StartBackendAsync("monitoring");
+        var incident = await StartBackendAsync("incident");
+        var alerting = await StartBackendAsync("alerting");
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(host =>
         {
@@ -37,8 +39,14 @@ public sealed class GatewayFixture : IAsyncLifetime
             host.UseSetting("ReverseProxy:Clusters:identity:Destinations:main:Address", identity);
             host.UseSetting("ReverseProxy:Clusters:registry:Destinations:main:Address", registry);
             host.UseSetting("ReverseProxy:Clusters:monitoring:Destinations:main:Address", monitoring);
+            host.UseSetting("ReverseProxy:Clusters:incident:Destinations:main:Address", incident);
+            host.UseSetting("ReverseProxy:Clusters:alerting:Destinations:main:Address", alerting);
         });
     }
+
+    /// <summary>Une passerelle à part, avec une limite basse, pour vérifier le dépassement.</summary>
+    public WebApplicationFactory<Program> WithAuthLimit(int permits) => _factory!.WithWebHostBuilder(host =>
+        host.UseSetting("RateLimiting:AuthPermitPerMinute", permits.ToString()));
 
     private async Task<string> StartBackendAsync(string name)
     {
@@ -92,6 +100,14 @@ public class GatewayTests(GatewayFixture fixture) : IClassFixture<GatewayFixture
     [InlineData("/api/services/7f3d1c9e-0000-4000-8000-000000000001/metrics", "monitoring")]
     [InlineData("/api/dashboard/overview", "monitoring")]
     [InlineData("/api/auth/me", "identity")]
+    [InlineData("/api/auth/organizations", "identity")]
+    [InlineData("/api/organization/members", "identity")]
+    [InlineData("/api/incidents", "incident")]
+    [InlineData("/api/incidents/7f3d1c9e-0000-4000-8000-000000000001", "incident")]
+    [InlineData("/api/alert-channels", "alerting")]
+    [InlineData("/api/alert-deliveries", "alerting")]
+    [InlineData("/api/agents", "monitoring")]
+    [InlineData("/hubs/notifications/negotiate", "alerting")]
     public async Task Chaque_route_arrive_au_bon_service(string path, string expected)
     {
         var echo = await fixture.Authenticated().GetFromJsonAsync<Echo>(path);
@@ -104,17 +120,47 @@ public class GatewayTests(GatewayFixture fixture) : IClassFixture<GatewayFixture
     [InlineData("/api/services")]
     [InlineData("/api/dashboard/overview")]
     [InlineData("/api/auth/me")]
+    [InlineData("/api/incidents")]
+    [InlineData("/api/alert-channels")]
+    [InlineData("/api/organization/members")]
+    [InlineData("/api/agents")]
+    [InlineData("/hubs/notifications/negotiate")]
     public async Task Sans_jeton_la_passerelle_arrete_la_requete(string path) =>
         Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Anonymous().GetAsync(path)).StatusCode);
 
     [Theory]
     [InlineData("/api/auth/login")]
     [InlineData("/api/auth/register")]
+    [InlineData("/api/auth/refresh")]
+    [InlineData("/api/auth/logout")]
+    [InlineData("/api/auth/invitations/preview")]
+    [InlineData("/api/auth/invitations/accept")]
     public async Task La_connexion_et_l_inscription_passent_sans_jeton(string path)
     {
         var response = await fixture.Anonymous().PostAsJsonAsync(path, new { });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("identity", (await response.Content.ReadFromJsonAsync<Echo>())!.Service);
+    }
+
+    /// <summary>Un agent n'a pas de jeton utilisateur : c'est Monitoring qui vérifie sa clé.</summary>
+    [Fact]
+    public async Task Le_battement_d_un_agent_passe_sans_jeton_mais_pas_le_reste_des_agents()
+    {
+        var ingest = await fixture.Anonymous().PostAsJsonAsync("/api/agents/ingest", new { });
+        Assert.Equal("monitoring", (await ingest.Content.ReadFromJsonAsync<Echo>())!.Service);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Anonymous().GetAsync("/api/agents/ingest")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Au_dela_de_la_limite_la_connexion_repond_429()
+    {
+        using var gateway = fixture.WithAuthLimit(2);
+        var client = gateway.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/auth/login", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/auth/login", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsJsonAsync("/api/auth/login", new { })).StatusCode);
+        // Une route sans limite propre n'est pas touchée.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/services")).StatusCode);
     }
 
     [Fact]

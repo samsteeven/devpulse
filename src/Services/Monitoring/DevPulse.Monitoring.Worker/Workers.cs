@@ -137,3 +137,25 @@ public sealed class RetentionService(
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 }
+
+/// <summary>Repère les agents qui ne donnent plus de nouvelles, toutes les 15 secondes.</summary>
+public sealed class AgentWatchService(IServiceScopeFactory scopes, TimeProvider clock, ILogger<AgentWatchService> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15), clock);
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var silent = await scope.ServiceProvider.GetRequiredService<IAgentStore>().DetectSilentAsync(clock.GetUtcNow(), stoppingToken);
+                if (silent > 0) logger.LogWarning("{Count} agent(s) silencieux", silent);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                logger.LogWarning(e, "Surveillance des agents impossible");
+            }
+        }
+    }
+}

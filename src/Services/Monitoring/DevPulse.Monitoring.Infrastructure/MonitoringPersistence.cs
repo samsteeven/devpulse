@@ -13,6 +13,8 @@ public sealed class MonitoringDb(DbContextOptions<MonitoringDb> options) : DbCon
 {
     public DbSet<MonitoredTarget> Targets => Set<MonitoredTarget>();
     public DbSet<HealthCheck> Checks => Set<HealthCheck>();
+    public DbSet<Agent> Agents => Set<Agent>();
+    public DbSet<AgentSample> AgentSamples => Set<AgentSample>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -40,6 +42,30 @@ public sealed class MonitoringDb(DbContextOptions<MonitoringDb> options) : DbCon
             e.Property(c => c.Failure).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(c => new { c.OrganizationId, c.ServiceId, c.CheckedAt });
             e.HasIndex(c => c.CheckedAt);
+        });
+
+        model.Entity<Agent>(e =>
+        {
+            e.ToTable("agents");
+            e.Property(a => a.Id).ValueGeneratedNever();
+            e.Property(a => a.Name).HasMaxLength(100);
+            e.Property(a => a.Environment).HasMaxLength(20);
+            e.Property(a => a.KeyHash).HasMaxLength(64);
+            e.Property(a => a.Hostname).HasMaxLength(255);
+            e.Property(a => a.OperatingSystem).HasMaxLength(100);
+            e.Property(a => a.AgentVersion).HasMaxLength(50);
+            e.Ignore(a => a.IsRevoked);
+            e.Ignore(a => a.Status);
+            e.Ignore(a => a.SilenceThreshold);
+            e.HasIndex(a => a.OrganizationId);
+        });
+
+        model.Entity<AgentSample>(e =>
+        {
+            e.ToTable("agent_samples");
+            e.Property(s => s.Id).ValueGeneratedNever();
+            e.HasIndex(s => new { s.OrganizationId, s.AgentId, s.At });
+            e.HasIndex(s => s.At);
         });
     }
 }
@@ -103,8 +129,9 @@ public sealed class TargetStore(MonitoringDb db, IOutbox outbox) : ITargetStore
         await db.SaveChangesAsync(ct);
     }
 
-    public Task<int> PurgeOlderThanAsync(DateTimeOffset limit, CancellationToken ct) =>
-        db.Checks.Where(c => c.CheckedAt < limit).ExecuteDeleteAsync(ct);
+    public async Task<int> PurgeOlderThanAsync(DateTimeOffset limit, CancellationToken ct) =>
+        await db.Checks.Where(c => c.CheckedAt < limit).ExecuteDeleteAsync(ct)
+        + await db.AgentSamples.Where(s => s.At < limit).ExecuteDeleteAsync(ct);
 }
 
 public sealed class HealthReadStore(MonitoringDb db) : IHealthReadStore

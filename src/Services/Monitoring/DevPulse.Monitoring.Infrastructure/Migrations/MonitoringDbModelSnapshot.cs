@@ -114,6 +114,136 @@ namespace DevPulse.Monitoring.Infrastructure.Migrations
                     b.ToTable("processed_messages", (string)null);
                 });
 
+            modelBuilder.Entity("DevPulse.Monitoring.Domain.Agent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AgentVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("agent_version");
+
+                    b.Property<double?>("CpuPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("cpu_percent");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<double?>("DiskPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("disk_percent");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("environment");
+
+                    b.Property<string>("Hostname")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("hostname");
+
+                    b.Property<int>("IntervalSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_seconds");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_hash");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<double?>("MemoryPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("memory_percent");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("operating_system");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<DateTimeOffset?>("SilentSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("silent_since");
+
+                    b.Property<long?>("UptimeSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("uptime_seconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agents");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_agents_organization_id");
+
+                    b.ToTable("agents", (string)null);
+                });
+
+            modelBuilder.Entity("DevPulse.Monitoring.Domain.AgentSample", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agent_id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<double>("CpuPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("cpu_percent");
+
+                    b.Property<double>("DiskPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("disk_percent");
+
+                    b.Property<double>("MemoryPercent")
+                        .HasColumnType("double precision")
+                        .HasColumnName("memory_percent");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent_samples");
+
+                    b.HasIndex("At")
+                        .HasDatabaseName("ix_agent_samples_at");
+
+                    b.HasIndex("OrganizationId", "AgentId", "At")
+                        .HasDatabaseName("ix_agent_samples_organization_id_agent_id_at");
+
+                    b.ToTable("agent_samples", (string)null);
+                });
+
             modelBuilder.Entity("DevPulse.Monitoring.Domain.HealthCheck", b =>
                 {
                     b.Property<Guid>("Id")

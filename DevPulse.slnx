@@ -4,6 +4,9 @@
     <Project Path="infrastructure/demo/DevPulse.DemoTarget/DevPulse.DemoTarget.csproj" />
   </Folder>
   <Folder Name="/src/" />
+  <Folder Name="/src/Agent/">
+    <Project Path="src/Agent/DevPulse.Agent/DevPulse.Agent.csproj" />
+  </Folder>
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/DevPulse.Contracts/DevPulse.Contracts.csproj" />
     <Project Path="src/BuildingBlocks/DevPulse.Messaging/DevPulse.Messaging.csproj" />
@@ -57,6 +60,7 @@
     <Project Path="src/Services/Registry/DevPulse.Registry.Tests/DevPulse.Registry.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DevPulse.Agent.Tests/DevPulse.Agent.Tests.csproj" />
     <Project Path="tests/DevPulse.ArchitectureTests/DevPulse.ArchitectureTests.csproj" />
     <Project Path="tests/DevPulse.IntegrationTests/DevPulse.IntegrationTests.csproj" />
     <Project Path="tests/DevPulse.Messaging.Tests/DevPulse.Messaging.Tests.csproj" />

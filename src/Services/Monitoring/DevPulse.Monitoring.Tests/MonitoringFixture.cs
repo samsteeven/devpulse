@@ -30,6 +30,7 @@ public sealed class MonitoringFixture : IAsyncLifetime
             host.UseSetting("ConnectionStrings:Database", _db.GetConnectionString());
             host.UseSetting("Jwt:PublicKey", Convert.ToBase64String(_rsa.ExportSubjectPublicKeyInfo()));
             host.UseSetting("Database:MigrateOnStartup", "true");
+            host.UseSetting("RabbitMq:Enabled", "false");
         });
         _factory.CreateClient().Dispose();
     }
@@ -40,7 +41,7 @@ public sealed class MonitoringFixture : IAsyncLifetime
         .UseSnakeCaseNamingConvention()
         .Options);
 
-    public HttpClient As(Guid organizationId)
+    public HttpClient As(Guid organizationId, string role = OrganizationRoles.Viewer)
     {
         var client = _factory!.CreateClient();
         var token = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
@@ -53,7 +54,7 @@ public sealed class MonitoringFixture : IAsyncLifetime
             [
                 new Claim(DevPulseClaims.Subject, Guid.NewGuid().ToString()),
                 new Claim(DevPulseClaims.OrganizationId, organizationId.ToString()),
-                new Claim(DevPulseClaims.OrganizationRole, OrganizationRoles.Viewer),
+                new Claim(DevPulseClaims.OrganizationRole, role),
             ]),
         });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

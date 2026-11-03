@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IHealthReadStore, HealthReadStore>();
         services.AddScoped<ITargetStore, TargetStore>();
+        services.AddScoped<IAgentStore, AgentStore>();
         services.AddScoped<HealthQueries>();
         return services;
     }

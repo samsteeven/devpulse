@@ -27,6 +27,9 @@ public static class OrganizationRoles
 public static class Policies
 {
     public const string ManageServices = nameof(ManageServices);
+    public const string ManageIncidents = nameof(ManageIncidents);
+    public const string ManageAlerts = nameof(ManageAlerts);
+    public const string ManageMembers = nameof(ManageMembers);
 }
 
 public sealed class JwtOptions
@@ -89,7 +92,18 @@ public static class JwtAuthenticationExtensions
             .SetFallbackPolicy(requireOrganization)
             .AddPolicy(Policies.ManageServices, policy => policy
                 .Combine(requireOrganization)
-                .RequireClaim(DevPulseClaims.OrganizationRole, OrganizationRoles.Owner, OrganizationRoles.Admin, OrganizationRoles.DevOps));
+                .RequireClaim(DevPulseClaims.OrganizationRole, OrganizationRoles.Owner, OrganizationRoles.Admin, OrganizationRoles.DevOps))
+            .AddPolicy(Policies.ManageAlerts, policy => policy
+                .Combine(requireOrganization)
+                .RequireClaim(DevPulseClaims.OrganizationRole, OrganizationRoles.Owner, OrganizationRoles.Admin, OrganizationRoles.DevOps))
+            // Un développeur d'astreinte doit pouvoir prendre en charge un incident ; un observateur, non.
+            .AddPolicy(Policies.ManageIncidents, policy => policy
+                .Combine(requireOrganization)
+                .RequireClaim(DevPulseClaims.OrganizationRole,
+                    OrganizationRoles.Owner, OrganizationRoles.Admin, OrganizationRoles.DevOps, OrganizationRoles.Developer))
+            .AddPolicy(Policies.ManageMembers, policy => policy
+                .Combine(requireOrganization)
+                .RequireClaim(DevPulseClaims.OrganizationRole, OrganizationRoles.Owner, OrganizationRoles.Admin));
 
         return services;
     }
@@ -97,6 +111,8 @@ public static class JwtAuthenticationExtensions
     public static Guid GetOrganizationId(this ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirstValue(DevPulseClaims.OrganizationId)
             ?? throw new InvalidOperationException("Jeton sans organisation."));
+
+    public static string? GetEmail(this ClaimsPrincipal user) => user.FindFirstValue("email");
 
     public static Guid GetUserId(this ClaimsPrincipal user) =>
         Guid.Parse(user.FindFirstValue(DevPulseClaims.Subject)

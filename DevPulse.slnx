@@ -21,6 +21,13 @@
     <Project Path="src/Services/Identity/DevPulse.Identity.Infrastructure/DevPulse.Identity.Infrastructure.csproj" />
     <Project Path="src/Services/Identity/DevPulse.Identity.Tests/DevPulse.Identity.Tests.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Incident/">
+    <Project Path="src/Services/Incident/DevPulse.Incident.Api/DevPulse.Incident.Api.csproj" />
+    <Project Path="src/Services/Incident/DevPulse.Incident.Application/DevPulse.Incident.Application.csproj" />
+    <Project Path="src/Services/Incident/DevPulse.Incident.Domain/DevPulse.Incident.Domain.csproj" />
+    <Project Path="src/Services/Incident/DevPulse.Incident.Infrastructure/DevPulse.Incident.Infrastructure.csproj" />
+    <Project Path="src/Services/Incident/DevPulse.Incident.Tests/DevPulse.Incident.Tests.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Monitoring/">
     <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Api/DevPulse.Monitoring.Api.csproj" />
     <Project Path="src/Services/Monitoring/DevPulse.Monitoring.Application/DevPulse.Monitoring.Application.csproj" />
@@ -40,5 +47,6 @@
     <Project Path="tests/DevPulse.ArchitectureTests/DevPulse.ArchitectureTests.csproj" />
     <Project Path="tests/DevPulse.IntegrationTests/DevPulse.IntegrationTests.csproj" />
     <Project Path="tests/DevPulse.Messaging.Tests/DevPulse.Messaging.Tests.csproj" />
+    <Project Path="tests/DevPulse.Testing/DevPulse.Testing.csproj" />
   </Folder>
 </Solution>

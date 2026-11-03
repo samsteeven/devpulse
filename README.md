@@ -16,6 +16,7 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 | Protection SSRF | Sondes et webhooks : écritures détournées refusées, adresse interne jamais contactée même si elle est en base | Un vrai DNS rebinding (testé avec `localhost`, pas un DNS piégé) |
 | Agent | Clé, révocation, silence détecté et incident ouvert, mesures réelles sous Windows ; sous Linux dans la CI | Un déploiement de l'agent sur une vraie flotte |
 | IA | Règles locales et fournisseur compatible OpenAI (requête, réponse, repli), contre un faux serveur HTTP | **Aucun appel à un vrai modèle** : pas de clé utilisée |
+| Supervision de la plateforme | En CI : les métriques métier (vérifications, messagerie, outbox, incidents, délai de notification) arrivent dans Prometheus, les 8 services ont des traces dans Tempo, Grafana charge le tableau de bord et 5 règles d'alerte versionnés ([détail](docs/observabilite/README.md)) | Qu'une règle se déclenche ; l'envoi vers Application Insights (pas de déploiement Azure) |
 | Images Docker | Construites et démarrées ensemble en CI, puis parcours navigateur et charge contre elles | Analyse de vulnérabilités des images |
 | Charge | k6 en CI, 20 utilisateurs pendant 30 s contre les conteneurs : environ 46 000 requêtes, 0 échec, P95 de 21 ms sur le runner GitHub (résultat dans le résumé de chaque exécution) | Une machine de production ; la montée en charge du worker de sondes |
 | AWS (Terraform) | `terraform validate` en CI | **Jamais appliqué** : aucun compte AWS utilisé, aucun `plan` calculé. Coût estimé dans [cout-aws.md](docs/architecture/cout-aws.md) |
@@ -43,7 +44,8 @@ Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core
 - **Le worker planifie sans appeler** : réservation des cibles dues en base (`FOR UPDATE SKIP LOCKED`), file bornée, nombre fixe de sondes.
 - **Une panne s'annonce au deuxième échec consécutif** : l'état affiché suit chaque vérification, l'incident attend la confirmation.
 - **Incident ouvre l'incident, Alerting ne fait que prévenir** ([ADR-012](docs/adr/README.md)) ; le temps réel est un canal d'Alerting ([ADR-013](docs/adr/README.md)).
-- **Fermé par défaut** : toute route exige un jeton rattaché à une organisation, sauf `[AllowAnonymous]` explicite.
+- **Fermé par défaut** : toute route exige un jeton rattaché à une organisation, sauf [AllowAnonymous] explicite.
+- **DevPulse est lui-même supervisé** : métriques métier, traces et journaux en OpenTelemetry, vers Grafana en local (http://localhost:3000) ou Application Insights sur Azure ([supervision](docs/observabilite/README.md)).
 
 Décisions : [`docs/adr`](docs/adr/README.md). Événements et garanties : [`docs/events`](docs/events/README.md). Corrections du cahier des charges : [`docs/architecture/ecarts-blueprint.md`](docs/architecture/ecarts-blueprint.md). Déploiement : AWS ([`infrastructure/terraform`](infrastructure/terraform/README.md)) ou Azure ([`infrastructure/terraform-azure`](infrastructure/terraform-azure/README.md), [ADR-017](docs/adr/README.md#adr-017--azure-container-apps-comme-seconde-cible-de-déploiement)). Webhooks, agent et API pour un système extérieur : [`docs/integrations`](docs/integrations/README.md).
 
@@ -61,7 +63,7 @@ docker compose --profile apps up -d --build    # http://localhost:5173
 **Pour développer** (services lancés avec `dotnet`, rechargement du front) :
 
 ```bash
-docker compose up -d --wait                    # PostgreSQL, RabbitMQ, Redis, collecteur OpenTelemetry
+docker compose up -d --wait                    # PostgreSQL, RabbitMQ, Redis, Grafana (http://localhost:3000)
 pwsh infrastructure/scripts/dev.ps1            # compile et lance les 9 processus (journaux dans .run/)
 cd apps/web/devpulse-web && npm ci && npm run dev
 ```
@@ -86,7 +88,7 @@ DevPulse__Url=https://devpulse.example.com DevPulse__AgentKey=dpa_… dotnet Dev
 ## Tests
 
 ```bash
-dotnet test                        # 248 tests ; Docker nécessaire (PostgreSQL et RabbitMQ réels, données en mémoire)
+dotnet test                        # 251 tests ; Docker nécessaire (PostgreSQL et RabbitMQ réels, données en mémoire)
 cd apps/web/devpulse-web && npm test
 cd tests/DevPulse.E2ETests && npm ci && npx playwright test    # services démarrés ; environ 4 minutes
 ```
@@ -99,14 +101,14 @@ cd tests/DevPulse.E2ETests && npm ci && npx playwright test    # services démar
 | `DevPulse.Incident.Tests` | 17 | ouverture, fermeture automatique, ordre des messages, analyse, rôles, isolation, statistiques |
 | `DevPulse.Alerting.Tests` | 15 | signature HMAC, SSRF à l'envoi, règles par canal, reprises, clé montrée une fois, isolation du hub SignalR |
 | `DevPulse.AI.Tests` | 14 | règles par type de panne, requête au modèle sans donnée d'identification, réponses rejetées, repli |
-| `DevPulse.Messaging.Tests` | 15 | outbox, doublons, reprises, file morte, topologie, contre un vrai RabbitMQ |
+| `DevPulse.Messaging.Tests` | 18 | outbox, doublons, reprises, file morte, topologie, métriques et jauge de l'outbox, contre un vrai RabbitMQ |
 | `DevPulse.Agent.Tests` | 5 | calcul processeur et mémoire, mesures réelles du système |
 | `DevPulse.IntegrationTests` | 36 | passerelle devant de faux services : routes, 401, limite de débit dépassée (429) |
 | `DevPulse.ArchitectureTests` | 25 | dépendances entre couches et services, événements tous reçus par une file |
 | Vitest (`devpulse-web`) | 34 | session en mémoire, renouvellement unique pour des requêtes simultanées, formats, composants |
 | Playwright (`DevPulse.E2ETests`) | 7 | parcours ci-dessus, invitation, session après rechargement, isolation |
 
-La CI (GitHub Actions) exécute tout cela, puis construit les images, démarre la plateforme complète, rejoue les parcours Playwright et la charge k6 contre les conteneurs, et valide les deux Terraform (AWS et Azure). Le workflow manuel « Publier les images » pousse les neuf images sur GitHub Container Registry, d'où le déploiement Azure les tire.
+La CI (GitHub Actions) exécute tout cela, puis construit les images, démarre la plateforme complète, rejoue les parcours Playwright et la charge k6 contre les conteneurs, vérifie que métriques et traces arrivent dans Grafana, et valide les deux Terraform (AWS et Azure). Le workflow manuel « Publier les images » pousse les neuf images sur GitHub Container Registry, d'où le déploiement Azure les tire.
 
 Non testés automatiquement : les services d'arrière-plan du worker (planificateur, synchronisation, purge, surveillance des agents) autrement que par le test navigateur ou par leurs dépendances ; le graphique, seulement vérifié visible.
 
@@ -141,12 +143,13 @@ src/Agent/DevPulse.Agent/        agent installé chez le client (Linux, Windows)
 src/Gateway/DevPulse.Gateway/    passerelle YARP
 src/BuildingBlocks/              Contracts, Messaging (RabbitMQ, outbox), Security (JWT, SSRF), Observability
 apps/web/devpulse-web/           Vue 3, TypeScript, Pinia, TanStack Query, ECharts, SignalR
-infrastructure/docker/           image .NET commune, initialisation PostgreSQL, collecteur
+infrastructure/docker/           image .NET commune, initialisation PostgreSQL
+infrastructure/observability/    tableau de bord Grafana et règles d'alerte de la plateforme
 infrastructure/terraform/        AWS ECS Fargate, RDS, Amazon MQ, ElastiCache
 infrastructure/terraform-azure/  Azure Container Apps, PostgreSQL Flexible Server, RabbitMQ en conteneur
 infrastructure/demo/             fausse API à surveiller et boîte à webhooks
 tests/                           architecture, messagerie, passerelle, agent, parcours navigateur, charge (k6)
-docs/                            ADR, événements, intégrations, écarts avec le cahier des charges, coûts AWS et Azure
+docs/                            ADR, événements, intégrations, supervision, écarts avec le cahier des charges, coûts AWS et Azure
 ```
 
 ## Licence

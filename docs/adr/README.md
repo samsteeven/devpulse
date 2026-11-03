@@ -9,7 +9,7 @@ Les huit premières viennent du cahier des charges (Technical Blueprint v1.0). L
 | 003 | RabbitMQ en `topic` pour les événements, HTTP pour ce qui attend une réponse | Outbox, idempotence, reprises et file morte à écrire | Fait ([ADR-009](#adr-009--rabbitmqclient-plutôt-que-masstransit)), testé contre un vrai RabbitMQ |
 | 004 | Passerelle YARP, sans règle métier | Point d'entrée unique à protéger | Fait |
 | 005 | Monitoring hybride : sondes HTTP et agent | L'agent demande une identité, une révocation, des collecteurs par système | Fait ([ADR-014](#adr-014--lagent-parle-à-monitoring-pas-au-collecteur-opentelemetry)) |
-| 006 | OpenTelemetry et Serilog | Un collecteur à exploiter | Fait en local, sans stockage |
+| 006 | OpenTelemetry et Serilog | Un collecteur à exploiter | Fait : métriques métier, Grafana en local, Application Insights sur Azure ([supervision](../observabilite/README.md)) |
 | 007 | IA derrière `IAIAnalysisProvider`, sans action automatique | Données à filtrer avant l'envoi | Fait ([ADR-015](#adr-015--deux-fournisseurs-danalyse-règles-locales-et-api-compatible-openai)) |
 | 008 | ECS Fargate sur AWS, déployé avec Terraform | Coût des services managés | Terraform écrit et validé en CI, **jamais appliqué** ; seconde cible Azure ([ADR-017](#adr-017--azure-container-apps-comme-seconde-cible-de-déploiement)) |
 

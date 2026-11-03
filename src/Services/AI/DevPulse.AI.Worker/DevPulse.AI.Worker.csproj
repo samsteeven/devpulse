@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.AI.Infrastructure\DevPulse.AI.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Messaging\DevPulse.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Observability\DevPulse.Observability.csproj" />
+  </ItemGroup>
+</Project>

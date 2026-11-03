@@ -14,6 +14,12 @@
     <Project Path="src/Gateway/DevPulse.Gateway/DevPulse.Gateway.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/AI/">
+    <Project Path="src/Services/AI/DevPulse.AI.Application/DevPulse.AI.Application.csproj" />
+    <Project Path="src/Services/AI/DevPulse.AI.Infrastructure/DevPulse.AI.Infrastructure.csproj" />
+    <Project Path="src/Services/AI/DevPulse.AI.Tests/DevPulse.AI.Tests.csproj" />
+    <Project Path="src/Services/AI/DevPulse.AI.Worker/DevPulse.AI.Worker.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Identity/">
     <Project Path="src/Services/Identity/DevPulse.Identity.Api/DevPulse.Identity.Api.csproj" />
     <Project Path="src/Services/Identity/DevPulse.Identity.Application/DevPulse.Identity.Application.csproj" />

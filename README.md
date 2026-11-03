@@ -88,7 +88,7 @@ DevPulse__Url=https://devpulse.example.com DevPulse__AgentKey=dpa_… dotnet Dev
 ## Tests
 
 ```bash
-dotnet test                        # 251 tests ; Docker nécessaire (PostgreSQL et RabbitMQ réels, données en mémoire)
+dotnet test                        # 257 tests ; Docker nécessaire (PostgreSQL et RabbitMQ réels, données en mémoire)
 cd apps/web/devpulse-web && npm test
 cd tests/DevPulse.E2ETests && npm ci && npx playwright test    # services démarrés ; environ 4 minutes
 ```
@@ -103,7 +103,7 @@ cd tests/DevPulse.E2ETests && npm ci && npx playwright test    # services démar
 | `DevPulse.AI.Tests` | 14 | règles par type de panne, requête au modèle sans donnée d'identification, réponses rejetées, repli |
 | `DevPulse.Messaging.Tests` | 18 | outbox, doublons, reprises, file morte, topologie, métriques et jauge de l'outbox, contre un vrai RabbitMQ |
 | `DevPulse.Agent.Tests` | 5 | calcul processeur et mémoire, mesures réelles du système |
-| `DevPulse.IntegrationTests` | 36 | passerelle devant de faux services : routes, 401, limite de débit dépassée (429) |
+| `DevPulse.IntegrationTests` | 42 | passerelle devant de faux services : routes, 401, limite de débit dépassée (429) ; filtre des métriques envoyées à Azure |
 | `DevPulse.ArchitectureTests` | 25 | dépendances entre couches et services, événements tous reçus par une file |
 | Vitest (`devpulse-web`) | 34 | session en mémoire, renouvellement unique pour des requêtes simultanées, formats, composants |
 | Playwright (`DevPulse.E2ETests`) | 7 | parcours ci-dessus, invitation, session après rechargement, isolation |

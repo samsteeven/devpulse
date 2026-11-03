@@ -124,6 +124,12 @@ log('Capture : alertes')
 // Grafana : le tableau de bord de la plateforme, sur les 20 dernières minutes, sans l'habillage de l'interface.
 const grafana = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })
 const g = await grafana.newPage()
+// Un panneau en erreur ne dit rien dans la capture : on journalise la réponse des requêtes en échec.
+g.on('response', async (response) => {
+  if (!response.url().includes('/api/ds/query')) return
+  const body = await response.text().catch(() => '')
+  if (response.status() >= 400 || body.includes('"error"')) log(`Grafana ${response.status()} : ${body.slice(0, 600)}`)
+})
 await g.goto(`${GRAFANA}/d/devpulse?orgId=1&from=now-20m&to=now&theme=dark&kiosk`)
 if (g.url().includes('/login')) {
   await g.getByLabel(/user/i).fill('admin')

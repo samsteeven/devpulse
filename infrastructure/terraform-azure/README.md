@@ -97,9 +97,7 @@ Le budget (`monthly_budget`, 20 $ par défaut, `budget_alert_email` obligatoire)
 Les images viennent de GitHub Container Registry : `ghcr.io/samsteeven/devpulse-<service>:<image_tag>` (identity, registry, monitoring-api, monitoring-worker, incident, alerting, ai-worker, gateway, web ; demo n'est pas déployé). Elles doivent être `linux/amd64`, seule architecture acceptée par Container Apps.
 
 1. Onglet **Actions** du dépôt > workflow « Publier les images » > **Run workflow**. Le résumé donne l'étiquette (SHA court du commit) à passer dans `image_tag`.
-2. Les paquets GHCR sont **privés** à leur création. Au choix :
-   - les rendre publics : page de chaque paquet > **Package settings** > **Change visibility** (neuf paquets) ;
-   - ou fournir des identifiants : `registry_username` (compte GitHub) et `registry_password`, un jeton d'accès personnel *classic* avec `read:packages`, de préférence par `TF_VAR_registry_password`. Terraform ajoute alors le bloc `registry` et son secret à chaque application.
+2. Publiés depuis ce dépôt public, les paquets en héritent la visibilité : le 3/11/2026, les neuf images de `0602669` se lisaient sans identifiants (vérifié par une lecture anonyme du registre). Un dépôt privé donnerait des paquets privés ; il faudrait alors fournir des identifiants : `registry_username` (compte GitHub) et `registry_password`, un jeton d'accès personnel *classic* avec `read:packages`, de préférence par `TF_VAR_registry_password`. Terraform ajoute alors le bloc `registry` et son secret à chaque application.
 
 ## Déployer
 

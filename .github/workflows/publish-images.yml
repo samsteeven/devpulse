@@ -70,4 +70,4 @@ jobs:
     steps:
       - run: |
           echo "Images publiées avec l'étiquette \`${GITHUB_SHA::7}\` : à passer comme \`image_tag\` au Terraform." >> "$GITHUB_STEP_SUMMARY"
-          echo "Les paquets GHCR sont privés à leur création : les rendre publics (Package settings) ou fournir des identifiants au Terraform." >> "$GITHUB_STEP_SUMMARY"
+          echo "Les paquets héritent de la visibilité du dépôt : publics ici. Depuis un dépôt privé, fournir des identifiants au Terraform." >> "$GITHUB_STEP_SUMMARY"

@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
 namespace DevPulse.Alerting.Tests;
@@ -29,6 +31,13 @@ public sealed class AlertingFixture : IAsyncLifetime
             host.UseSetting("RabbitMq:Enabled", "false");
             // Comme en production : les webhooks vers localhost ou un réseau privé sont refusés.
             host.UseSetting("TargetPolicy:AllowPrivateTargets", "false");
+            // Les tests pilotent leur propre expéditeur. Celui de l'API, sur la même base, prenait parfois l'envoi en
+            // premier et le refusait (adresse locale interdite ici) : le test échouait une fois sur quelques-unes.
+            host.ConfigureTestServices(services =>
+            {
+                foreach (var hosted in services.Where(d => d.ImplementationType == typeof(DeliveryDispatcher)).ToList())
+                    services.Remove(hosted);
+            });
         });
         Factory.CreateClient().Dispose();
     }

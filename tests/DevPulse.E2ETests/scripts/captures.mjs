@@ -139,6 +139,25 @@ if (g.url().includes('/login')) {
 }
 await g.getByText('Vérifications par minute').waitFor()
 await sleep(8000) // rendu des panneaux
+
+// Diagnostic : ce que Grafana voit réellement, si un panneau est en erreur.
+const diagnostic = await g.evaluate(async () => {
+  const sources = await fetch('/api/datasources').then(async (r) => `${r.status} ${(await r.text()).slice(0, 400)}`)
+  const query = await fetch('/api/ds/query', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'now-20m', to: 'now', queries: [{ refId: 'A', datasource: { type: 'prometheus', uid: 'prometheus' },
+      expr: 'sum(rate(devpulse_checks_total[5m])) * 60', instant: true, range: false }] }),
+  }).then(async (r) => `${r.status} ${(await r.text()).slice(0, 600)}`)
+  return { sources, query }
+})
+log(`Grafana sources : ${diagnostic.sources}`)
+log(`Grafana requête : ${diagnostic.query}`)
+const errorIcon = g.locator('[data-testid*="status"] svg, [aria-label*="rror"]').first()
+if (await errorIcon.count()) {
+  await errorIcon.hover().catch(() => {})
+  await sleep(1000)
+  log(`Grafana infobulle : ${(await g.locator('[role="tooltip"]').allInnerTexts().catch(() => [])).join(' | ').slice(0, 400)}`)
+}
 await g.screenshot({ path: OUT + 'vitrine-grafana.png' })
 log('Capture : Grafana')
 

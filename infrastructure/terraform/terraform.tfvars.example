@@ -1,0 +1,44 @@
+# Copier en terraform.tfvars (ignoré par Git) et adapter.
+
+aws_region  = "eu-west-3"
+environment = "demo"
+
+# Tag poussé dans chaque dépôt ECR (les tags sont immuables : utiliser le SHA du commit).
+image_tag = "0123abc"
+
+# Vide : HTTP seul, pour une démonstration courte. Certificat ACM de la même région pour activer HTTPS.
+certificate_arn = ""
+
+# Faux : tâches en sous-réseaux publics avec IP publique, sans NAT (moins cher).
+enable_nat_gateway = false
+
+# Workers sur Fargate Spot.
+use_spot_for_workers = true
+
+# Arrêter le calcul sans détruire les données : tout à 0, puis `terraform apply`.
+# desired_counts = {
+#   "gateway"           = 0
+#   "web"               = 0
+#   "identity"          = 0
+#   "registry"          = 0
+#   "monitoring-api"    = 0
+#   "monitoring-worker" = 0
+#   "incident"          = 0
+#   "alerting"          = 0
+#   "ai-worker"         = 0
+# }
+
+# Plus de mémoire pour un service :
+# service_resources = {
+#   "monitoring-worker" = { cpu = 512, memory = 1024 }
+# }
+
+# Analyse par un modèle de langage (sortie Internet nécessaire : IP publique ou NAT).
+# ai_provider = "Llm"
+# ai_base_url = "https://api.openai.com/v1/"
+# ai_model    = "gpt-4o-mini"
+# ai_api_key  = "sk-..."   # de préférence par TF_VAR_ai_api_key plutôt que dans un fichier
+
+db_backup_retention_days = 1
+db_deletion_protection   = false
+log_retention_days       = 14

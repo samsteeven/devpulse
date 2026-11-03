@@ -1,0 +1,49 @@
+# Copier en terraform.tfvars (ignoré par Git) et adapter.
+
+# Une des régions autorisées pour l'abonnement (Azure for Students : voir README, « Trouver les régions autorisées »).
+location    = "francecentral"
+environment = "demo"
+
+# Étiquette publiée par le workflow « Publier les images » (SHA court du commit).
+image_tag = "0123abc"
+
+# Paquets GHCR privés : compte GitHub et jeton d'accès personnel (classic) avec read:packages.
+# De préférence par TF_VAR_registry_password plutôt que dans ce fichier.
+# registry_username = "samsteeven"
+# registry_password = "ghp_..."
+
+# Budget mensuel de l'abonnement (USD pour Azure for Students) et adresse des alertes.
+monthly_budget     = 20
+budget_alert_email = "moi@example.com"
+# enable_budget    = false   # si Azure refuse le budget pour cette offre
+
+# Faux : pas de réseau virtuel, PostgreSQL public limité aux adresses Azure (environ 25 $/mois de moins).
+enable_vnet = true
+
+# Plafond d'ingestion des journaux, en Go par jour.
+daily_quota_gb = 0.15
+
+# Tout réveiller plus vite (pas de démarrage à froid), au prix du tarif actif ou inactif 24 h/24 :
+# replicas = {
+#   "web"     = { min = 1, max = 1 }
+#   "gateway" = { min = 1, max = 1 }
+# }
+
+# Plus de mémoire pour RabbitMQ :
+# app_resources = {
+#   "rabbitmq" = { cpu = 0.5, memory = "1Gi" }
+# }
+
+# Courtier externe au lieu du conteneur RabbitMQ (CloudAMQP : l'hôte virtuel est le nom d'utilisateur).
+# external_rabbitmq_host     = "xxx.rmq.cloudamqp.com"
+# external_rabbitmq_port     = 5671
+# external_rabbitmq_use_tls  = true
+# external_rabbitmq_user     = "abcdefgh"
+# external_rabbitmq_vhost    = "abcdefgh"
+# external_rabbitmq_password = "..."   # de préférence par TF_VAR_external_rabbitmq_password
+
+# Analyse par un modèle de langage.
+# ai_provider = "Llm"
+# ai_base_url = "https://api.openai.com/v1/"
+# ai_model    = "gpt-4o-mini"
+# ai_api_key  = "sk-..."   # de préférence par TF_VAR_ai_api_key

@@ -22,6 +22,8 @@ public sealed class IdentityDb(DbContextOptions<IdentityDb> options) : IdentityU
 {
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Invitation> Invitations => Set<Invitation>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -43,6 +45,29 @@ public sealed class IdentityDb(DbContextOptions<IdentityDb> options) : IdentityU
             e.HasIndex(m => m.OrganizationId);
             e.HasOne<AppUser>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Organization>().WithMany().HasForeignKey(m => m.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<RefreshToken>(e =>
+        {
+            e.ToTable("refresh_tokens");
+            e.Property(t => t.Id).ValueGeneratedNever();
+            e.Property(t => t.TokenHash).HasMaxLength(64);
+            e.HasIndex(t => t.TokenHash).IsUnique();
+            e.HasIndex(t => t.FamilyId);
+            e.HasIndex(t => new { t.UserId, t.OrganizationId });
+            e.HasOne<AppUser>().WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<Invitation>(e =>
+        {
+            e.ToTable("invitations");
+            e.Property(i => i.Id).ValueGeneratedNever();
+            e.Property(i => i.Email).HasMaxLength(254);
+            e.Property(i => i.Role).HasConversion<string>().HasMaxLength(20);
+            e.Property(i => i.TokenHash).HasMaxLength(64);
+            e.HasIndex(i => i.TokenHash).IsUnique();
+            e.HasIndex(i => new { i.OrganizationId, i.Email });
+            e.HasOne<Organization>().WithMany().HasForeignKey(i => i.OrganizationId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
@@ -94,6 +119,29 @@ public sealed class AccountStore(
         return new RegistrationResult(RegistrationOutcome.Created, new AccountRecord(user.Id, email));
     }
 
+    public async Task<RegistrationResult> CreateUserAsync(string email, string password, CancellationToken ct)
+    {
+        var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
+        IdentityResult created;
+        try
+        {
+            created = await users.CreateAsync(user, password);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return new RegistrationResult(RegistrationOutcome.EmailTaken);
+        }
+
+        if (created.Succeeded) return new RegistrationResult(RegistrationOutcome.Created, new AccountRecord(user.Id, email));
+
+        var codes = created.Errors.Select(e => e.Code).ToList();
+        return codes.Contains(nameof(IdentityErrorDescriber.DuplicateEmail)) || codes.Contains(nameof(IdentityErrorDescriber.DuplicateUserName))
+            ? new RegistrationResult(RegistrationOutcome.EmailTaken)
+            : new RegistrationResult(RegistrationOutcome.InvalidPassword, Errors: created.Errors.Select(e => e.Description).ToList());
+    }
+
+    public async Task<bool> ExistsAsync(string email, CancellationToken ct) => await users.FindByEmailAsync(email) is not null;
+
     public async Task<AccountRecord?> VerifyCredentialsAsync(string email, string password, CancellationToken ct)
     {
         var user = await users.FindByEmailAsync(email);
@@ -132,6 +180,76 @@ public sealed class AccountStore(
 
         return row is null ? null : (row.organization, row.membership);
     }
+
+    public async Task<IReadOnlyList<(Organization Organization, Membership Membership)>> ListMembershipsAsync(Guid userId, CancellationToken ct)
+    {
+        var rows = await (
+            from membership in db.Memberships.AsNoTracking()
+            join organization in db.Organizations.AsNoTracking() on membership.OrganizationId equals organization.Id
+            where membership.UserId == userId
+            orderby organization.Name
+            select new { organization, membership }).ToListAsync(ct);
+        return rows.Select(r => (r.organization, r.membership)).ToList();
+    }
+
+    public Task<Organization?> FindOrganizationAsync(Guid organizationId, CancellationToken ct) =>
+        db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == organizationId, ct);
+
+    public async Task<IReadOnlyList<MemberRecord>> ListMembersAsync(Guid organizationId, CancellationToken ct) =>
+        await (
+            from membership in db.Memberships.AsNoTracking()
+            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+            where membership.OrganizationId == organizationId
+            orderby membership.CreatedAt
+            select new MemberRecord(user.Id, user.Email!, membership.Role, membership.CreatedAt)).ToListAsync(ct);
+
+    public Task<Membership?> FindMemberAsync(Guid organizationId, Guid userId, CancellationToken ct) =>
+        db.Memberships.FirstOrDefaultAsync(m => m.OrganizationId == organizationId && m.UserId == userId, ct);
+
+    public Task<int> CountOwnersAsync(Guid organizationId, CancellationToken ct) =>
+        db.Memberships.CountAsync(m => m.OrganizationId == organizationId && m.Role == OrganizationRole.Owner, ct);
+
+    public void AddMembership(Membership membership) => db.Memberships.Add(membership);
+
+    public void RemoveMembership(Membership membership) => db.Memberships.Remove(membership);
+
+    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+}
+
+public sealed class SessionStore(IdentityDb db) : ISessionStore
+{
+    public void Add(RefreshToken token) => db.RefreshTokens.Add(token);
+
+    public Task<RefreshToken?> FindByHashAsync(string hash, CancellationToken ct) =>
+        db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+
+    public async Task RevokeFamilyAsync(Guid familyId, DateTimeOffset now, CancellationToken ct)
+    {
+        foreach (var token in await db.RefreshTokens.Where(t => t.FamilyId == familyId && t.RevokedAt == null).ToListAsync(ct))
+            token.Revoke(now);
+    }
+
+    public async Task RevokeForMemberAsync(Guid userId, Guid organizationId, DateTimeOffset now, CancellationToken ct)
+    {
+        var active = await db.RefreshTokens.Where(t => t.UserId == userId && t.OrganizationId == organizationId && t.RevokedAt == null).ToListAsync(ct);
+        foreach (var token in active) token.Revoke(now);
+    }
+}
+
+public sealed class InvitationStore(IdentityDb db) : IInvitationStore
+{
+    public void Add(Invitation invitation) => db.Invitations.Add(invitation);
+
+    public Task<Invitation?> FindByHashAsync(string hash, CancellationToken ct) =>
+        db.Invitations.FirstOrDefaultAsync(i => i.TokenHash == hash, ct);
+
+    public Task<Invitation?> FindAsync(Guid organizationId, Guid id, CancellationToken ct) =>
+        db.Invitations.FirstOrDefaultAsync(i => i.OrganizationId == organizationId && i.Id == id, ct);
+
+    public async Task<IReadOnlyList<Invitation>> ListPendingAsync(Guid organizationId, DateTimeOffset now, CancellationToken ct) =>
+        await db.Invitations
+            .Where(i => i.OrganizationId == organizationId && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now)
+            .OrderByDescending(i => i.CreatedAt).ToListAsync(ct);
 }
 
 public sealed class RsaTokenIssuer : ITokenIssuer
@@ -202,7 +320,10 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<ITokenIssuer, RsaTokenIssuer>();
         services.AddScoped<IAccountStore, AccountStore>();
+        services.AddScoped<ISessionStore, SessionStore>();
+        services.AddScoped<IInvitationStore, InvitationStore>();
         services.AddScoped<AccountService>();
+        services.AddScoped<TeamService>();
         return services;
     }
 }

@@ -1,3 +1,4 @@
+using DevPulse.Identity.Application;
 using DevPulse.Identity.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -9,12 +10,24 @@ public sealed class BusinessErrorFilter : IExceptionFilter
 {
     public void OnException(ExceptionContext context)
     {
-        if (context.Exception is not DomainException) return;
-
-        context.Result = new ObjectResult(new ProblemDetails { Status = StatusCodes.Status400BadRequest, Title = context.Exception.Message })
+        if (context.Exception is PasswordRejectedException rejected)
         {
-            StatusCode = StatusCodes.Status400BadRequest,
+            var errors = new Dictionary<string, string[]> { ["Password"] = [.. rejected.Errors] };
+            context.Result = new BadRequestObjectResult(new ValidationProblemDetails(errors));
+            context.ExceptionHandled = true;
+            return;
+        }
+
+        int? status = context.Exception switch
+        {
+            DomainException => StatusCodes.Status400BadRequest,
+            ForbiddenException => StatusCodes.Status403Forbidden,
+            ConflictException => StatusCodes.Status409Conflict,
+            _ => null,
         };
+        if (status is null) return;
+
+        context.Result = new ObjectResult(new ProblemDetails { Status = status, Title = context.Exception.Message }) { StatusCode = status };
         context.ExceptionHandled = true;
     }
 }

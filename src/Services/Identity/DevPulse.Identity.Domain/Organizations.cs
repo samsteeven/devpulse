@@ -62,4 +62,6 @@ public sealed class Membership
 
     public static Membership Create(Guid userId, Guid organizationId, OrganizationRole role, DateTimeOffset now) =>
         new() { Id = Guid.NewGuid(), UserId = userId, OrganizationId = organizationId, Role = role, CreatedAt = now };
+
+    public void ChangeRole(OrganizationRole role) => Role = role;
 }

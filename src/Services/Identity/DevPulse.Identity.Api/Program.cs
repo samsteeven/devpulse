@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDevPulseObservability("identity-service");
-builder.Services.AddControllers(options => options.Filters.Add<BusinessErrorFilter>());
+builder.Services.AddControllers(options => options.Filters.Add<BusinessErrorFilter>())
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -16,6 +17,7 @@ builder.Services.AddOptions<JwtOptions>()
     .Validate(o => !string.IsNullOrWhiteSpace(o.PrivateKey), "Jwt:PrivateKey est obligatoire pour Identity.")
     .ValidateOnStart();
 builder.Services.AddIdentityInfrastructure();
+builder.Services.AddOptions<DevPulse.Identity.Api.Controllers.AuthCookieOptions>().BindConfiguration(DevPulse.Identity.Api.Controllers.AuthCookieOptions.SectionName);
 builder.Services.AddHealthChecks().AddDbContextCheck<IdentityDb>("database", tags: ["ready"]);
 
 var app = builder.Build();

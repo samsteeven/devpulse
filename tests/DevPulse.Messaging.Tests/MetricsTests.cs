@@ -131,12 +131,14 @@ public class MetricsTests(BrokerFixture fixture)
         using var host = builder.Build();
         await host.StartAsync();
 
+        // Les jauges sont un état du processus : un test précédent a pu y laisser sa dernière valeur. On attend donc
+        // celle de cet événement-ci, vieux de trois minutes, plutôt que la première valeur venue.
         await WaitUntilAsync(() =>
         {
             measurements.Observe();
-            return measurements.Last("devpulse.outbox.pending", ("store", nameof(TestDb))) == 1;
+            return measurements.Last("devpulse.outbox.oldest.age", ("store", nameof(TestDb))) is >= 170 and <= 600;
         });
-        Assert.InRange(measurements.Last("devpulse.outbox.oldest.age", ("store", nameof(TestDb)))!.Value, 170, 600);
+        Assert.Equal(1, measurements.Last("devpulse.outbox.pending", ("store", nameof(TestDb))));
         await host.StopAsync();
     }
 }

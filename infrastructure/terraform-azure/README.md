@@ -2,7 +2,7 @@
 
 Variante Azure du déploiement AWS ([`infrastructure/terraform`](../terraform/README.md)), pensée pour un abonnement **Azure for Students** (environ 100 $ de crédit, sans carte bancaire) : tout ce qui peut s'arrêter s'arrête, les journaux sont plafonnés et un budget prévient par courriel.
 
-**Ce code n'a jamais été appliqué.** Personne n'a lancé `terraform plan`, encore moins `apply`. Il a été écrit sur un poste sans Terraform : `fmt` et `validate` n'y ont pas été exécutés, c'est la CI qui les lance (`fmt -check`, `init -backend=false`, `validate`). Ces commandes vérifient la syntaxe, les types et les références, pas le comportement chez Azure.
+**Ce code n'a jamais été appliqué.** Personne n'a lancé `terraform plan`, encore moins `apply`. La CI exécute `fmt -check`, `init -backend=false` et `validate`, qui passent : cela vérifie la syntaxe, les types et les références, pas le comportement chez Azure.
 
 ## Ce qui est vérifié, et ce qui ne l'est pas
 
@@ -10,7 +10,7 @@ Variante Azure du déploiement AWS ([`infrastructure/terraform`](../terraform/RE
 |---|---|---|
 | Noms des variables d'environnement | Relus dans `docker-compose.yml` (profil `apps`) et dans le code (`RabbitMqOptions`, `ForwardedHeaders` de la passerelle, `Auth:SecureCookie`, `InternalApi`, `Redis:ConnectionString`, `Registry:BaseUrl`) | Que chaque service démarre avec exactement cette configuration |
 | Clés JWT | Même dérivation PEM vers base64 DER que la version AWS (rejouée en .NET), même bloc `check` | Sur une clé produite par le fournisseur `tls` lui-même |
-| Arguments des ressources | Relus le 3/11/2026 dans la documentation d'`hashicorp/azurerm` 5.x (branche principale) et dans son guide de migration 5.0 : `container_app`, `container_app_environment`, `postgresql_flexible_server` et `_database`, `subnet`, `private_dns_zone_virtual_network_link`, `log_analytics_workspace`, `consumption_budget_subscription`, `managed_redis`, bloc `provider` | `terraform validate` sur ce poste ; un vrai `plan` (valeurs refusées seulement par l'API Azure) |
+| Arguments des ressources | Relus le 3/11/2026 dans la documentation d'`hashicorp/azurerm` 5.x (branche principale) et dans son guide de migration 5.0 : `container_app`, `container_app_environment`, `postgresql_flexible_server` et `_database`, `subnet`, `private_dns_zone_virtual_network_link`, `log_analytics_workspace`, `consumption_budget_subscription`, `managed_redis`, bloc `provider` | Un vrai `plan` (valeurs refusées seulement par l'API Azure) |
 | Comportement de Container Apps | Microsoft Learn : appel par `http://<application>`, redirection HTTP vers HTTPS si `allowInsecure` est faux, entrée TCP interne joignable par `<application>:<port exposé>` et possible **sans** réseau virtuel (seule l'entrée TCP externe en exige un), sous-réseau /27 délégué pour un environnement à profils de charge de travail, couples CPU/mémoire, WebSocket pris en charge | Rien n'a tourné : ni nginx vers `http://gateway`, ni YARP vers les API, ni le WebSocket `/hubs` à travers deux proxys |
 | PostgreSQL 17 | Disponible sur Flexible Server (17.11, Microsoft Learn du 26/08/2026) ; `version = "17"` accepté par azurerm 5.x | Création réelle, disponibilité du B1ms dans la région autorisée de l'abonnement |
 | Budget | Arguments relus | Qu'Azure l'accepte sur Azure for Students : la page « Understand Cost Management data » range encore cette offre (MS-AZR-0170P) parmi les non prises en charge, la page Education Hub conseille d'y créer des budgets |

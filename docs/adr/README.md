@@ -117,7 +117,7 @@ Les huit premières viennent du cahier des charges (Technical Blueprint v1.0). L
 | ECR | GitHub Container Registry | Gratuit pour un dépôt public ; publication par le workflow manuel « Publier les images » |
 | RDS PostgreSQL | PostgreSQL Flexible Server (B1ms), accès privé | Même moteur, même chaîne de connexion |
 | Amazon MQ | RabbitMQ en conteneur, ou un courtier externe | Azure n'a pas de RabbitMQ géré ; Service Bus demanderait un second transport |
-| ElastiCache | Facultatif, désactivé par défaut | Une seule instance d'Alerting n'a pas besoin de fond de panier SignalR |
+| ElastiCache | Facultatif (Azure Managed Redis), désactivé par défaut | Une seule instance d'Alerting n'a pas besoin de fond de panier SignalR ; Azure Cache for Redis n'accepte plus de nouveaux caches |
 | Secrets Manager | Secrets de Container Apps | Gratuit ; Key Vault et identité managée en production |
 | — | Budget avec alertes, plafond quotidien des journaux | Le crédit étudiant ne doit pas s'épuiser sans prévenir |
 
@@ -127,3 +127,5 @@ Les huit premières viennent du cahier des charges (Technical Blueprint v1.0). L
 - RabbitMQ en conteneur n'a pas de stockage durable : un redémarrage perd les messages déjà en file. L'outbox ne protège que les événements pas encore confirmés par le courtier. Acceptable pour une démonstration, pas en production.
 - Les API mises à zéro publient leurs événements à leur réveil : ils restent en base d'ici là. Incident et Alerting gardent une instance, car ils consomment des files.
 - La région n'a pas de valeur par défaut : elle doit faire partie des régions autorisées de l'abonnement.
+- Le réseau virtuel ne sert qu'à garder PostgreSQL privé, et coûte environ un quart de la facture (répartiteur et IP de l'environnement) : il peut être désactivé pour une démonstration courte, PostgreSQL devenant joignable depuis toute adresse Azure.
+- Derrière le front, la passerelle ne voit probablement que l'adresse de nginx : sa limite de connexions deviendrait commune à tous les visiteurs. À vérifier au premier déploiement.

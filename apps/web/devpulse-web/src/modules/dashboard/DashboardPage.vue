@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import { errorMessage, monitoringApi } from '@/api/client'
+import { errorMessage, incidentsApi, monitoringApi } from '@/api/client'
+import IncidentBadges from '@/components/IncidentBadges.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import { failureLabel, formatMs, formatRelative } from '@/composables/format'
+import { failureLabel, formatDuration, formatMs, formatRelative } from '@/composables/format'
 
+// Le temps réel rafraîchit dès qu'un état change ; l'interrogation reste en filet de sécurité.
 const overview = useQuery({
   queryKey: ['overview'],
   queryFn: monitoringApi.overview,
-  refetchInterval: 5000,
+  refetchInterval: 10_000,
+})
+const incidents = useQuery({
+  queryKey: ['incidents', 'Active'],
+  queryFn: () => incidentsApi.list('Active'),
+  refetchInterval: 30_000,
 })
 
 const tiles = computed(() => {
@@ -36,6 +43,17 @@ const services = computed(() =>
   <p v-if="overview.isError.value" class="mb-4 rounded-md border border-bad/40 bg-bad/10 p-3 text-sm text-bad" role="alert">
     {{ errorMessage(overview.error.value) }}
   </p>
+
+  <section v-if="incidents.data.value?.length" class="mb-6 rounded-lg border border-bad/40 bg-bad/5 p-4" data-testid="active-incidents">
+    <h2 class="mb-2 text-sm font-semibold text-bad">{{ incidents.data.value.length }} incident(s) en cours</h2>
+    <ul class="space-y-1 text-sm">
+      <li v-for="incident in incidents.data.value" :key="incident.id" class="flex flex-wrap items-center gap-3">
+        <RouterLink :to="`/incidents/${incident.id}`" class="font-medium hover:text-accent">{{ incident.title }}</RouterLink>
+        <IncidentBadges :severity="incident.severity" :status="incident.status" />
+        <span class="text-xs text-muted">depuis {{ formatDuration(incident.durationSeconds) }}</span>
+      </li>
+    </ul>
+  </section>
 
   <dl class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
     <div v-for="tile in tiles" :key="tile.id" class="rounded-lg border border-line bg-surface p-4">

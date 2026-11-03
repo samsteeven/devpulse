@@ -13,7 +13,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     // Le navigateur ne parle qu'à la passerelle, sur la même origine : pas de CORS à ouvrir.
-    proxy: { '/api': process.env.VITE_GATEWAY_URL ?? 'http://localhost:8080' },
+    proxy: {
+      '/api': process.env.VITE_GATEWAY_URL ?? 'http://localhost:8080',
+      '/hubs': { target: process.env.VITE_GATEWAY_URL ?? 'http://localhost:8080', ws: true },
+    },
   },
   test: {
     environment: 'jsdom',

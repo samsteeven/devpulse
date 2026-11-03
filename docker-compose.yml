@@ -2,6 +2,20 @@ name: devpulse
 
 # Infrastructure locale. Tous les ports sont publiés sur 127.0.0.1 uniquement.
 # Les variables « ?: » font échouer le démarrage plutôt que de partir sans mot de passe.
+x-app-env: &app-env
+  ASPNETCORE_ENVIRONMENT: Production
+  DOTNET_ENVIRONMENT: Production
+  Jwt__PublicKey: ${JWT_PUBLIC_KEY}
+  Database__MigrateOnStartup: "true"
+  RabbitMq__Host: rabbitmq
+  RabbitMq__User: ${RABBITMQ_USER:-devpulse}
+  RabbitMq__Password: ${RABBITMQ_PASSWORD}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  # La cible de démonstration est sur le réseau Docker : autorisé ici, jamais en production.
+  TargetPolicy__AllowPrivateTargets: ${ALLOW_PRIVATE_TARGETS:-false}
+  # Le cookie Secure n'est pas renvoyé sur http://127.0.0.1 par tous les navigateurs ; en local seulement.
+  Auth__SecureCookie: ${SECURE_COOKIE:-true}
+
 services:
   postgres:
     image: postgres:17.11-alpine
@@ -71,6 +85,126 @@ services:
     ports:
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
+
+  # --- Applications (profil « apps ») : docker compose --profile apps up -d --build ---------------------------
+  # Les images n'ont pas de shell (chiseled) : pas de healthcheck interne. La CI attend la passerelle de l'extérieur.
+
+  identity:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Identity/DevPulse.Identity.Api } }
+    image: devpulse/identity:local
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_identity;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+      Jwt__PrivateKey: ${JWT_PRIVATE_KEY}
+
+  registry:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Registry/DevPulse.Registry.Api } }
+    image: devpulse/registry:local
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_registry;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+      InternalApi__Key: ${INTERNAL_API_KEY}
+
+  monitoring-api:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Monitoring/DevPulse.Monitoring.Api } }
+    image: devpulse/monitoring-api:local
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_monitoring;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+
+  monitoring-worker:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Monitoring/DevPulse.Monitoring.Worker } }
+    image: devpulse/monitoring-worker:local
+    restart: unless-stopped
+    depends_on: [monitoring-api, registry]
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_monitoring;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+      InternalApi__Key: ${INTERNAL_API_KEY}
+      Registry__BaseUrl: http://registry:8080/
+      Monitoring__SyncIntervalSeconds: "5"
+      Database__MigrateOnStartup: "false"
+
+  incident:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Incident/DevPulse.Incident.Api } }
+    image: devpulse/incident:local
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_incident;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+
+  alerting:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/Alerting/DevPulse.Alerting.Api } }
+    image: devpulse/alerting:local
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy }, redis: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      ConnectionStrings__Database: Host=postgres;Database=devpulse_alerting;Username=${POSTGRES_USER:-devpulse};Password=${POSTGRES_PASSWORD}
+      Redis__ConnectionString: redis:6379,password=${REDIS_PASSWORD},abortConnect=false
+
+  ai-worker:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Services/AI/DevPulse.AI.Worker } }
+    image: devpulse/ai-worker:local
+    restart: unless-stopped
+    depends_on: { rabbitmq: { condition: service_healthy } }
+    environment:
+      <<: *app-env
+      # Rules par défaut ; Llm avec Ai__BaseUrl, Ai__Model et Ai__ApiKey pour un modèle compatible OpenAI.
+      Ai__Provider: ${AI_PROVIDER:-Rules}
+      Ai__BaseUrl: ${AI_BASE_URL:-}
+      Ai__Model: ${AI_MODEL:-}
+      Ai__ApiKey: ${AI_API_KEY:-}
+
+  gateway:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: src/Gateway/DevPulse.Gateway } }
+    image: devpulse/gateway:local
+    restart: unless-stopped
+    depends_on: [identity, registry, monitoring-api, incident, alerting]
+    environment:
+      <<: *app-env
+      ReverseProxy__Clusters__identity__Destinations__main__Address: http://identity:8080/
+      ReverseProxy__Clusters__registry__Destinations__main__Address: http://registry:8080/
+      ReverseProxy__Clusters__monitoring__Destinations__main__Address: http://monitoring-api:8080/
+      ReverseProxy__Clusters__incident__Destinations__main__Address: http://incident:8080/
+      ReverseProxy__Clusters__alerting__Destinations__main__Address: http://alerting:8080/
+      ForwardedHeaders__TrustedNetworks__0: 172.16.0.0/12
+      RateLimiting__AuthPermitPerMinute: ${AUTH_PERMIT_PER_MINUTE:-20}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  web:
+    profiles: [apps]
+    build: { context: apps/web/devpulse-web }
+    image: devpulse/web:local
+    restart: unless-stopped
+    depends_on: [gateway]
+    ports:
+      - "127.0.0.1:5173:8080"
+
+  # Fausse API à surveiller et boîte à webhooks, pour la démonstration et les tests de bout en bout.
+  demo:
+    profiles: [apps]
+    build: { context: ., dockerfile: infrastructure/docker/dotnet.Dockerfile, args: { PROJECT: infrastructure/demo/DevPulse.DemoTarget } }
+    image: devpulse/demo:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5020:8080"
 
 volumes:
   postgres_data:

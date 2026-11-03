@@ -105,6 +105,18 @@ public sealed class Incident
 
     public IReadOnlyList<TimelineEntry> Timeline => _timeline;
 
+    /// <summary>Libellés de la chronologie, écrits une fois pour toutes à l'ouverture.</summary>
+    private static readonly Dictionary<string, string> FailureText = new()
+    {
+        ["Timeout"] = "délai dépassé",
+        ["ConnectionError"] = "connexion impossible",
+        ["TlsError"] = "erreur TLS",
+        ["Redirect"] = "redirection non suivie",
+        ["UnexpectedStatus"] = "code HTTP inattendu",
+        ["BlockedTarget"] = "cible refusée",
+        ["AgentSilent"] = "agent silencieux",
+    };
+
     public bool IsActive => Status != IncidentStatus.Resolved;
 
     public static IncidentSeverity SeverityFor(string environment) => environment switch
@@ -135,7 +147,8 @@ public sealed class Incident
             OpenedAt = now,
         };
 
-        var detail = detection.HttpStatusCode is { } code ? $"{detection.Failure}, HTTP {code}" : detection.Failure;
+        var failure = FailureText.GetValueOrDefault(detection.Failure, detection.Failure);
+        var detail = detection.HttpStatusCode is { } code ? $"{failure}, HTTP {code}" : failure;
         incident._timeline.Add(TimelineEntry.Create(incident.Id, TimelineKind.Detected, detection.DetectedAt,
             $"Panne confirmée après {detection.FailureCount} échec(s) consécutif(s) ({detail})."));
         return incident;

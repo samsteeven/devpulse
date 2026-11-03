@@ -1,7 +1,9 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
-const DEMO = 'http://localhost:5020'
-const GATEWAY = 'http://localhost:8080'
+// DEMO : la fausse API vue du test. DEMO_TARGET : la même vue par DevPulse (différente dans Docker Compose).
+const DEMO = process.env.DEMO_URL ?? 'http://localhost:5020'
+const DEMO_TARGET = process.env.DEMO_TARGET_URL ?? DEMO
+const GATEWAY = process.env.GATEWAY_URL ?? 'http://localhost:8080'
 const PASSWORD = 'un-mot-de-passe-solide'
 // Intervalle minimal de 30 s, plus la réservation et le rafraîchissement de la page (5 s).
 const NEXT_CHECK = 50_000
@@ -25,15 +27,19 @@ async function register(page: Page, organization: string, email: string) {
 async function addService(page: Page, name: string) {
   await page.getByRole('button', { name: 'Ajouter un service' }).click()
   await page.getByLabel('Nom', { exact: true }).fill(name)
-  await page.getByLabel('URL de base').fill(DEMO)
+  await page.getByLabel('URL de base').fill(DEMO_TARGET)
   await page.getByLabel('Intervalle').fill('30')
   await page.getByLabel("Délai d'attente").fill('5')
   await page.getByRole('button', { name: 'Enregistrer' }).click()
   await expect(page.getByTestId('service-row').filter({ hasText: name })).toBeVisible()
 }
 
-const accessToken = (page: Page) =>
-  page.evaluate(() => JSON.parse(sessionStorage.getItem('devpulse.session')!).accessToken as string)
+// Le jeton n'est stocké nulle part dans la page : on en obtient un par le cookie de renouvellement, comme l'application.
+async function accessToken(page: Page) {
+  const response = await page.request.post('/api/auth/refresh', { headers: { 'X-Requested-With': 'DevPulse' } })
+  expect(response.ok()).toBe(true)
+  return (await response.json()).accessToken as string
+}
 
 test.beforeEach(async ({ request }) => {
   await setDemoMode(request, 'ok')

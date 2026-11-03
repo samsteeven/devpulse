@@ -45,15 +45,23 @@ $common = @{
     DOTNET_ENVIRONMENT          = 'Development'
     Jwt__PublicKey              = $dotenv.JWT_PUBLIC_KEY
     OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4317'
+    RabbitMq__Host              = 'localhost'
+    RabbitMq__User              = $dotenv.RABBITMQ_USER
+    RabbitMq__Password          = $dotenv.RABBITMQ_PASSWORD
+    # Cible de démonstration et boîte à webhooks sur localhost : à ne jamais activer ailleurs.
+    TargetPolicy__AllowPrivateTargets = $dotenv.ALLOW_PRIVATE_TARGETS
 }
 
 $services = @(
     @{ Name = 'identity';   Project = 'src/Services/Identity/DevPulse.Identity.Api';     Port = 5010; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_identity'); Jwt__PrivateKey = $dotenv.JWT_PRIVATE_KEY; Database__MigrateOnStartup = 'true' } }
-    @{ Name = 'registry';   Project = 'src/Services/Registry/DevPulse.Registry.Api';     Port = 5011; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_registry'); InternalApi__Key = $dotenv.INTERNAL_API_KEY; TargetPolicy__AllowPrivateTargets = $dotenv.ALLOW_PRIVATE_TARGETS; Database__MigrateOnStartup = 'true' } }
+    @{ Name = 'registry';   Project = 'src/Services/Registry/DevPulse.Registry.Api';     Port = 5011; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_registry'); InternalApi__Key = $dotenv.INTERNAL_API_KEY; Database__MigrateOnStartup = 'true' } }
     @{ Name = 'monitoring'; Project = 'src/Services/Monitoring/DevPulse.Monitoring.Api'; Port = 5012; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_monitoring'); Database__MigrateOnStartup = 'true' } }
+    @{ Name = 'incident';   Project = 'src/Services/Incident/DevPulse.Incident.Api';     Port = 5013; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_incident'); Database__MigrateOnStartup = 'true' } }
+    @{ Name = 'alerting';   Project = 'src/Services/Alerting/DevPulse.Alerting.Api';     Port = 5014; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_alerting'); Database__MigrateOnStartup = 'true'; Redis__ConnectionString = "localhost:6379,password=$($dotenv.REDIS_PASSWORD),abortConnect=false" } }
     @{ Name = 'gateway';    Project = 'src/Gateway/DevPulse.Gateway';                    Port = 8080; Env = @{} }
     @{ Name = 'demo';       Project = 'infrastructure/demo/DevPulse.DemoTarget';         Port = 5020; Env = @{} }
-    @{ Name = 'worker';     Project = 'src/Services/Monitoring/DevPulse.Monitoring.Worker'; Port = 0; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_monitoring'); InternalApi__Key = $dotenv.INTERNAL_API_KEY; TargetPolicy__AllowPrivateTargets = $dotenv.ALLOW_PRIVATE_TARGETS; Registry__BaseUrl = 'http://localhost:5011/'; Monitoring__SyncIntervalSeconds = '5' } }
+    @{ Name = 'worker';     Project = 'src/Services/Monitoring/DevPulse.Monitoring.Worker'; Port = 0; Env = @{ ConnectionStrings__Database = (Connection 'devpulse_monitoring'); InternalApi__Key = $dotenv.INTERNAL_API_KEY; Registry__BaseUrl = 'http://localhost:5011/'; Monitoring__SyncIntervalSeconds = '5' } }
+    @{ Name = 'ai';         Project = 'src/Services/AI/DevPulse.AI.Worker';              Port = 0; Env = @{} }
 )
 
 foreach ($service in $services) {
@@ -72,8 +80,8 @@ foreach ($service in $services) {
 
     foreach ($pair in $service.Env.GetEnumerator()) { Remove-Item "env:$($pair.Key)" }
 
-    # Les API appliquent leurs migrations au démarrage : le worker, lancé en dernier, trouve ses tables.
-    if ($service.Name -in 'identity', 'registry', 'monitoring', 'gateway') {
+    # Les API appliquent leurs migrations au démarrage : les workers, lancés en dernier, trouvent leurs tables.
+    if ($service.Port -and $service.Name -ne 'demo') {
         $path = if ($service.Name -eq 'gateway') { '/health/live' } else { '/health/ready' }
         $deadline = (Get-Date).AddSeconds(60)
         while ($true) {

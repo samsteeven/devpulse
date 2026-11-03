@@ -9,14 +9,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
 
@@ -26,7 +30,7 @@ jobs:
       - name: Build
         run: dotnet build DevPulse.slnx --no-restore -c Release
 
-      # Les tests d'intégration démarrent un vrai PostgreSQL via Testcontainers (Docker présent sur le runner).
+      # Les tests d'intégration démarrent PostgreSQL et RabbitMQ réels via Testcontainers (Docker présent sur le runner).
       - name: Test
         run: dotnet test DevPulse.slnx --no-build -c Release
 
@@ -36,10 +40,10 @@ jobs:
       run:
         working-directory: apps/web/devpulse-web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -49,3 +53,96 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
+
+  # Les images réelles, démarrées ensemble, puis les parcours navigateur et une mesure de charge contre elles.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Secrets jetables
+        shell: pwsh
+        run: |
+          ./infrastructure/scripts/make-env.ps1
+          # Cible de démonstration et boîte à webhooks sur le réseau Docker.
+          Add-Content .env 'ALLOW_PRIVATE_TARGETS=true'
+          Add-Content .env 'AUTH_PERMIT_PER_MINUTE=200'
+
+      - name: Construction des images
+        run: docker compose --profile apps build
+
+      - name: Démarrage
+        run: |
+          docker compose --profile apps up -d --wait --wait-timeout 180 postgres rabbitmq redis otel-collector
+          docker compose --profile apps up -d
+          # Images sans shell : la disponibilité se vérifie de l'extérieur, par la passerelle et le front.
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://localhost:8080/api/auth/login || true)
+            web=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/ || true)
+            if [ "$code" = "400" ] && [ "$web" = "200" ]; then echo "Prêt après $((i*2)) s"; break; fi
+            sleep 2
+          done
+          docker compose --profile apps ps
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/DevPulse.E2ETests/package-lock.json
+
+      - name: Parcours navigateur
+        working-directory: tests/DevPulse.E2ETests
+        env:
+          BASE_URL: http://localhost:5173
+          GATEWAY_URL: http://localhost:8080
+          DEMO_URL: http://localhost:5020
+          DEMO_TARGET_URL: http://demo:8080
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+      - name: Charge (k6)
+        run: |
+          docker run --rm --network host -e GATEWAY_URL=http://localhost:8080 -e DEMO_TARGET_URL=http://demo:8080 \
+            -v "$PWD/tests/load:/scripts" grafana/k6:1.8.1 run --summary-export /scripts/summary.json /scripts/dashboard.js
+          {
+            echo '### Charge : 20 utilisateurs, 30 s, sur le runner GitHub'
+            echo '| Point de terminaison | Moyenne | Médiane | P95 | P99 |'
+            echo '|---|---|---|---|---|'
+            for endpoint in overview services; do
+              jq -r --arg e "$endpoint" '.metrics["http_req_duration{endpoint:" + $e + "}"] | "| \($e) | \(.avg|floor) ms | \(.med|floor) ms | \(.["p(95)"]|floor) ms | \(.["p(99)"]|floor) ms |"' tests/load/summary.json
+            done
+            jq -r '"Requêtes : \(.metrics.http_reqs.count), échecs : \(.metrics.http_req_failed.value * 100) %"' tests/load/summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Journaux des services
+        if: always()
+        run: docker compose --profile apps logs --no-color > compose-logs.txt
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            compose-logs.txt
+            tests/DevPulse.E2ETests/test-results/
+            tests/load/summary.json
+            docs/screenshots/
+          retention-days: 7
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      # Validation seulement : aucun accès à AWS depuis la CI, aucun plan n'est calculé.
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate

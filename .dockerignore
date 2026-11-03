@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/test-results/
+**/playwright-report/
+.git/
+.run/
+.env
+docs/
+tests/
+infrastructure/terraform/

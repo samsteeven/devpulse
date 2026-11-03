@@ -11,7 +11,7 @@ const auth = useAuthStore()
 const adding = ref(false)
 
 const services = useQuery({ queryKey: ['services'], queryFn: servicesApi.list })
-const overview = useQuery({ queryKey: ['overview'], queryFn: monitoringApi.overview, refetchInterval: 5000 })
+const overview = useQuery({ queryKey: ['overview'], queryFn: monitoringApi.overview, refetchInterval: 10_000 })
 
 const statusById = computed(() => new Map(overview.data.value?.services.map((s) => [s.serviceId, s.status])))
 

@@ -1,11 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { authApi } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { AuthResponse } from '@/types/api'
+import type { AuthResponse, Role } from '@/types/api'
 
-const response = (role: string, expiresIn = 900): AuthResponse => ({
-  accessToken: 'jeton',
-  expiresIn,
+const response = (role: Role, token = 'jeton'): AuthResponse => ({
+  accessToken: token,
+  expiresIn: 900,
   userId: 'u1',
   email: 'moi@example.test',
   organization: { id: 'o1', name: 'Atelier Nova', slug: 'atelier-nova', role },
@@ -14,51 +15,66 @@ const response = (role: string, expiresIn = 900): AuthResponse => ({
 describe('useAuthStore', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     setActivePinia(createPinia())
-    vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
-  it('ouvre puis ferme une session, y compris dans le stockage', () => {
+  it("garde le jeton en mémoire seulement : rien dans le stockage du navigateur", () => {
     const auth = useAuthStore()
     auth.open(response('Owner'))
+
     expect(auth.isAuthenticated).toBe(true)
-    expect(sessionStorage.getItem('devpulse.session')).toContain('jeton')
+    expect(JSON.stringify({ ...sessionStorage })).not.toContain('jeton')
+    expect(JSON.stringify({ ...localStorage })).not.toContain('jeton')
+  })
 
-    auth.close()
+  it('reprend la session à partir du cookie de renouvellement', async () => {
+    vi.spyOn(authApi, 'refresh').mockResolvedValue(response('Admin', 'nouveau'))
+    const auth = useAuthStore()
+
+    expect(await auth.renew()).toBe(true)
+    expect(auth.session?.accessToken).toBe('nouveau')
+    expect(auth.session?.organization.role).toBe('Admin')
+  })
+
+  it('ferme la session si le renouvellement est refusé', async () => {
+    vi.spyOn(authApi, 'refresh').mockRejectedValue(new Error('401'))
+    const auth = useAuthStore()
+    auth.open(response('Owner'))
+
+    expect(await auth.renew()).toBe(false)
     expect(auth.isAuthenticated).toBe(false)
-    expect(sessionStorage.getItem('devpulse.session')).toBeNull()
   })
 
-  it('retrouve la session après un rechargement de page', () => {
-    useAuthStore().open(response('Owner'))
+  it('partage un seul renouvellement entre des appels simultanés', async () => {
+    const refresh = vi.spyOn(authApi, 'refresh').mockResolvedValue(response('Owner'))
+    const auth = useAuthStore()
 
-    setActivePinia(createPinia())
-    expect(useAuthStore().session?.email).toBe('moi@example.test')
+    await Promise.all([auth.renew(), auth.renew(), auth.renew()])
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('ignore une session expirée dans le stockage', () => {
-    vi.useFakeTimers({ now: Date.parse('2026-11-03T12:00:00Z') })
-    useAuthStore().open(response('Owner', 60))
+  it('ferme la session locale même si la déconnexion échoue côté serveur', async () => {
+    vi.spyOn(authApi, 'logout').mockRejectedValue(new Error('hors ligne'))
+    const auth = useAuthStore()
+    auth.open(response('Owner'))
 
-    vi.setSystemTime(Date.parse('2026-11-03T12:02:00Z'))
-    setActivePinia(createPinia())
-    expect(useAuthStore().session).toBeNull()
+    await auth.logout()
+    expect(auth.isAuthenticated).toBe(false)
   })
 
-  it('ignore un contenu de stockage illisible', () => {
-    sessionStorage.setItem('devpulse.session', '{pas du json')
-    expect(useAuthStore().session).toBeNull()
-  })
-
-  it.each([
-    ['Owner', true],
-    ['Admin', true],
-    ['DevOps', true],
-    ['Developer', false],
-    ['Viewer', false],
-  ])('le rôle %s peut gérer les services : %s', (role, expected) => {
+  it.each<[Role, boolean, boolean, boolean]>([
+    ['Owner', true, true, true],
+    ['Admin', true, true, true],
+    ['DevOps', true, true, false],
+    ['Developer', false, true, false],
+    ['Viewer', false, false, false],
+  ])('le rôle %s : services %s, incidents %s, équipe %s', (role, services, incidents, team) => {
     const auth = useAuthStore()
     auth.open(response(role))
-    expect(auth.canManageServices).toBe(expected)
+    expect(auth.canManageServices).toBe(services)
+    expect(auth.canRespond).toBe(incidents)
+    expect(auth.canManageTeam).toBe(team)
   })
 })

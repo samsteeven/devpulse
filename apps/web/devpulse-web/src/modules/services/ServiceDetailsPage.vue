@@ -27,7 +27,7 @@ const service = useQuery({ queryKey: computed(() => ['services', props.id]), que
 const health = useQuery({
   queryKey: computed(() => ['health', props.id]),
   queryFn: () => monitoringApi.health(props.id),
-  refetchInterval: 5000,
+  refetchInterval: 10_000,
 })
 const metrics = useQuery({
   queryKey: computed(() => ['metrics', props.id, hours.value]),

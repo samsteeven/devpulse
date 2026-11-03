@@ -1,0 +1,66 @@
+name: Captures d'écran
+
+# Lancé à la main : démarre toute la plateforme à partir des images, la remplit de données réalistes
+# (tests/DevPulse.E2ETests/scripts/captures.mjs) et publie les captures en artefact.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  captures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Secrets jetables
+        shell: pwsh
+        run: |
+          ./infrastructure/scripts/make-env.ps1
+          Add-Content .env 'ALLOW_PRIVATE_TARGETS=true'
+
+      - name: Démarrage de la plateforme
+        run: |
+          docker compose --profile apps build
+          docker compose --profile apps up -d --wait --wait-timeout 180 postgres rabbitmq redis observability
+          docker compose --profile apps up -d
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://localhost:8080/api/auth/login || true)
+            web=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/ || true)
+            if [ "$code" = "400" ] && [ "$web" = "200" ]; then echo "Prêt après $((i*2)) s"; break; fi
+            sleep 2
+          done
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/DevPulse.E2ETests/package-lock.json
+
+      - name: Captures
+        working-directory: tests/DevPulse.E2ETests
+        env:
+          BASE_URL: http://localhost:5173
+          GATEWAY_URL: http://localhost:8080
+          DEMO_URL: http://localhost:5020
+          DEMO_TARGET_URL: http://demo:8080
+          GRAFANA_URL: http://localhost:3000
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run captures
+
+      - name: Journaux des services
+        if: failure()
+        run: docker compose --profile apps logs --no-color > compose-logs.txt
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: captures
+          path: |
+            docs/screenshots/vitrine-*.png
+            compose-logs.txt
+          retention-days: 7

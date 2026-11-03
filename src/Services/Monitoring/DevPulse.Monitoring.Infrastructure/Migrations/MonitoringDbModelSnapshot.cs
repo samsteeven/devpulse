@@ -22,6 +22,98 @@ namespace DevPulse.Monitoring.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("DevPulse.Messaging.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("RoutingKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("routing_key");
+
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("trace_parent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_messages");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_outbox_messages_next_attempt_at")
+                        .HasFilter("published_at IS NULL");
+
+                    b.HasIndex("PublishedAt")
+                        .HasDatabaseName("ix_outbox_messages_published_at");
+
+                    b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("DevPulse.Messaging.ProcessedMessage", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Consumer")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("consumer");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.HasKey("MessageId", "Consumer")
+                        .HasName("pk_processed_messages");
+
+                    b.HasIndex("ProcessedAt")
+                        .HasDatabaseName("ix_processed_messages_processed_at");
+
+                    b.ToTable("processed_messages", (string)null);
+                });
+
             modelBuilder.Entity("DevPulse.Monitoring.Domain.HealthCheck", b =>
                 {
                     b.Property<Guid>("Id")
@@ -98,6 +190,10 @@ namespace DevPulse.Monitoring.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("environment");
 
+                    b.Property<DateTimeOffset?>("FirstFailureAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_failure_at");
+
                     b.Property<int>("IntervalSeconds")
                         .HasColumnType("integer")
                         .HasColumnName("interval_seconds");
@@ -133,6 +229,10 @@ namespace DevPulse.Monitoring.Infrastructure.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("OutageSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("outage_since");
 
                     b.Property<string>("TargetUrl")
                         .IsRequired()

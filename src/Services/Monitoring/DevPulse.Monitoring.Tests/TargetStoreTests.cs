@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using DevPulse.Contracts.Internal;
+using DevPulse.Messaging;
 using DevPulse.Monitoring.Application;
 using DevPulse.Monitoring.Domain;
 using DevPulse.Monitoring.Infrastructure;
@@ -14,24 +15,33 @@ public class TargetStoreTests(MonitoringFixture fixture)
     private static ActiveServiceDto Service(Guid? organization = null, string url = "https://api.example.com/health", int interval = 60) =>
         new(Guid.NewGuid(), organization ?? Guid.NewGuid(), "Payment API", "Production", url, interval, 5);
 
+    private static TargetStore Store(MonitoringDb db) => new(db, new EfOutbox<MonitoringDb>(db, new OutboxSignal()));
+
     /// <summary>Isole chaque test : les tables sont partagées dans la collection.</summary>
     private async Task ResetAsync()
     {
         await using var db = fixture.NewDb();
         await db.Checks.ExecuteDeleteAsync();
         await db.Targets.ExecuteDeleteAsync();
+        await db.Set<OutboxMessage>().ExecuteDeleteAsync();
+    }
+
+    private async Task<List<string>> OutboxAsync()
+    {
+        await using var db = fixture.NewDb();
+        return await db.Set<OutboxMessage>().OrderBy(m => m.OccurredAt).Select(m => m.RoutingKey).ToListAsync();
     }
 
     private async Task SyncAsync(IReadOnlyList<ActiveServiceDto> active, DateTimeOffset now)
     {
         await using var db = fixture.NewDb();
-        await new TargetStore(db).SynchronizeAsync(active, now, default);
+        await Store(db).SynchronizeAsync(active, now, default);
     }
 
     private async Task<IReadOnlyList<CheckAssignment>> ClaimAsync(int max, DateTimeOffset now)
     {
         await using var db = fixture.NewDb();
-        return await new TargetStore(db).ClaimDueAsync(max, now, default);
+        return await Store(db).ClaimDueAsync(max, now, default);
     }
 
     private static ProbeResult Result(HealthStatus status, DateTimeOffset at, int ms = 120, int? http = 200) =>
@@ -98,7 +108,7 @@ public class TargetStoreTests(MonitoringFixture fixture)
         await SyncAsync([service], now);
         await ClaimAsync(10, now);
         await using (var db = fixture.NewDb())
-            await new TargetStore(db).RecordAsync(service.ServiceId, Result(HealthStatus.Down, now, http: 503), default);
+            await Store(db).RecordAsync(service.ServiceId, Result(HealthStatus.Down, now, http: 503), default);
 
         await SyncAsync([service with { TargetUrl = "https://new.example.com/health" }], now);
 
@@ -120,7 +130,7 @@ public class TargetStoreTests(MonitoringFixture fixture)
         async Task<int> RecordAsync(HealthStatus status)
         {
             await using var db = fixture.NewDb();
-            await new TargetStore(db).RecordAsync(service.ServiceId, Result(status, now), default);
+            await Store(db).RecordAsync(service.ServiceId, Result(status, now), default);
             return (await db.Targets.AsNoTracking().SingleAsync(t => t.ServiceId == service.ServiceId)).ConsecutiveFailures;
         }
 
@@ -128,6 +138,60 @@ public class TargetStoreTests(MonitoringFixture fixture)
         Assert.Equal(2, await RecordAsync(HealthStatus.Down));
         Assert.Equal(3, await RecordAsync(HealthStatus.Down));
         Assert.Equal(0, await RecordAsync(HealthStatus.Degraded));
+    }
+
+    [Fact]
+    public async Task Une_panne_n_est_annoncee_qu_au_deuxieme_echec_et_sa_reprise_une_seule_fois()
+    {
+        await ResetAsync();
+        var start = DateTimeOffset.UtcNow;
+        var service = Service();
+        await SyncAsync([service], start);
+
+        async Task<List<string>> RecordAsync(HealthStatus status, int minute)
+        {
+            var before = (await OutboxAsync()).Count;
+            await using (var db = fixture.NewDb())
+                await Store(db).RecordAsync(service.ServiceId, Result(status, start.AddMinutes(minute)), default);
+            return (await OutboxAsync()).Skip(before).ToList();
+        }
+
+        Assert.Equal(["monitoring.service.status-changed.v1"], await RecordAsync(HealthStatus.Operational, 0));
+        // Un seul échec : l'état affiché change, aucune panne n'est annoncée.
+        Assert.Equal(["monitoring.service.status-changed.v1"], await RecordAsync(HealthStatus.Down, 1));
+        Assert.Equal(["monitoring.service.down-detected.v1"], await RecordAsync(HealthStatus.Down, 2));
+        Assert.Empty(await RecordAsync(HealthStatus.Down, 3));
+        // Lent mais répond : la panne est terminée.
+        Assert.Equal(["monitoring.service.status-changed.v1", "monitoring.service.recovered.v1"], await RecordAsync(HealthStatus.Degraded, 4));
+        Assert.Equal(["monitoring.service.status-changed.v1"], await RecordAsync(HealthStatus.Operational, 5));
+
+        await using var check = fixture.NewDb();
+        var events = await check.Set<OutboxMessage>().ToListAsync();
+        var down = System.Text.Json.JsonDocument.Parse(events.Single(e => e.EventType == "monitoring.service.down-detected").Payload).RootElement;
+        Assert.Equal(2, down.GetProperty("failureCount").GetInt32());
+        Assert.Equal(service.OrganizationId, down.GetProperty("organizationId").GetGuid());
+        Assert.Equal("Payment API", down.GetProperty("serviceName").GetString());
+
+        // La panne date du premier échec, pas de sa confirmation.
+        var recovered = System.Text.Json.JsonDocument.Parse(events.Single(e => e.EventType == "monitoring.service.recovered").Payload).RootElement;
+        Assert.Equal(start.AddMinutes(1), recovered.GetProperty("downSince").GetDateTimeOffset(), TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task Un_echec_isole_ne_produit_jamais_de_reprise()
+    {
+        await ResetAsync();
+        var now = DateTimeOffset.UtcNow;
+        var service = Service();
+        await SyncAsync([service], now);
+
+        foreach (var status in new[] { HealthStatus.Down, HealthStatus.Operational, HealthStatus.Down, HealthStatus.Operational })
+        {
+            await using var db = fixture.NewDb();
+            await Store(db).RecordAsync(service.ServiceId, Result(status, now), default);
+        }
+
+        Assert.DoesNotContain(await OutboxAsync(), key => key.Contains("down-detected") || key.Contains("recovered"));
     }
 
     [Fact]
@@ -139,7 +203,7 @@ public class TargetStoreTests(MonitoringFixture fixture)
         await SyncAsync([service], now);
         await using (var db = fixture.NewDb())
         {
-            var store = new TargetStore(db);
+            var store = Store(db);
             await store.RecordAsync(service.ServiceId, Result(HealthStatus.Operational, now.AddDays(-8)), default);
             await store.RecordAsync(service.ServiceId, Result(HealthStatus.Operational, now), default);
 
@@ -158,7 +222,7 @@ public class TargetStoreTests(MonitoringFixture fixture)
         var service = Service(alice);
         await SyncAsync([service, Service(bob)], now);
         await using (var db = fixture.NewDb())
-            await new TargetStore(db).RecordAsync(service.ServiceId, Result(HealthStatus.Down, now, ms: 40, http: 503), default);
+            await Store(db).RecordAsync(service.ServiceId, Result(HealthStatus.Down, now, ms: 40, http: 503), default);
 
         var aliceClient = fixture.As(alice);
         var overview = await aliceClient.GetFromJsonAsync<OverviewResponse>("/api/dashboard/overview");
@@ -184,7 +248,7 @@ public class TargetStoreTests(MonitoringFixture fixture)
         await SyncAsync([service], now);
         await using (var db = fixture.NewDb())
         {
-            var store = new TargetStore(db);
+            var store = Store(db);
             for (var i = 1; i <= 19; i++)
                 await store.RecordAsync(service.ServiceId, Result(HealthStatus.Operational, now.AddMinutes(-i), ms: i * 10), default);
             await store.RecordAsync(service.ServiceId, Result(HealthStatus.Down, now.AddMinutes(-30), ms: 5000, http: null), default);

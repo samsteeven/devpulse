@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DevPulse.Contracts.Events.Common;
 using DevPulse.Contracts.Events.Monitoring;
+using DevPulse.Contracts.Messaging;
+using DevPulse.Messaging;
 
 namespace DevPulse.ArchitectureTests;
 
@@ -15,6 +18,10 @@ public partial class EventContractTests
         OrganizationId = Guid.NewGuid(),
         CorrelationId = "c3d4e5f6",
         ServiceId = Guid.NewGuid(),
+        ServiceName = "Payment API",
+        Environment = "Production",
+        Source = MonitoringSources.Probe,
+        Failure = "UnexpectedStatus",
         FailureCount = 3,
         LastHttpStatusCode = 503,
         DetectedAt = DateTimeOffset.UtcNow,
@@ -48,15 +55,25 @@ public partial class EventContractTests
         Assert.Equal(1, json.GetProperty("version").GetInt32());
     }
 
-    // Sémantique des échanges « topic » : « * » remplace exactement un mot, « # » zéro ou plusieurs.
-    private static bool TopicMatches(string binding, string routingKey)
+    private static bool TopicMatches(string binding, string routingKey) => Topology.Matches(binding, routingKey);
+
+    private static IEnumerable<Type> AllEvents() => typeof(IntegrationEvent).Assembly.GetTypes()
+        .Where(t => typeof(IntegrationEvent).IsAssignableFrom(t) && !t.IsAbstract);
+
+    /// <summary>Un événement que personne ne reçoit est soit inutile, soit une liaison oubliée : dans les deux cas, à corriger.</summary>
+    [Fact]
+    public void Chaque_evenement_arrive_dans_au_moins_une_file()
     {
-        var pattern = "^" + string.Join(@"\.", binding.Split('.').Select(word => word switch
+        foreach (var type in AllEvents())
         {
-            "*" => @"[^.]+",
-            "#" => @".*",
-            _ => Regex.Escape(word),
-        })) + "$";
-        return Regex.IsMatch(routingKey, pattern);
+            var key = EventSerializer.RoutingKeyOf(type);
+            Assert.Matches(RoutingKeyFormat(), key);
+            Assert.True(EventTopology.Bindings.Values.SelectMany(b => b).Any(binding => TopicMatches(binding, key)), $"{key} n'est lié à aucune file");
+        }
     }
+
+    [Fact]
+    public void Les_changements_d_etat_n_ouvrent_pas_d_incident() =>
+        Assert.DoesNotContain(EventTopology.Bindings[EventTopology.IncidentServiceState],
+            binding => TopicMatches(binding, "monitoring.service.status-changed.v1"));
 }

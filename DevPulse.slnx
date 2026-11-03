@@ -6,6 +6,7 @@
   <Folder Name="/src/" />
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/DevPulse.Contracts/DevPulse.Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/DevPulse.Messaging/DevPulse.Messaging.csproj" />
     <Project Path="src/BuildingBlocks/DevPulse.Observability/DevPulse.Observability.csproj" />
     <Project Path="src/BuildingBlocks/DevPulse.Security/DevPulse.Security.csproj" />
   </Folder>
@@ -38,5 +39,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/DevPulse.ArchitectureTests/DevPulse.ArchitectureTests.csproj" />
     <Project Path="tests/DevPulse.IntegrationTests/DevPulse.IntegrationTests.csproj" />
+    <Project Path="tests/DevPulse.Messaging.Tests/DevPulse.Messaging.Tests.csproj" />
   </Folder>
 </Solution>

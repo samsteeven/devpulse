@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="OpenTelemetry" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DevPulse.Contracts\DevPulse.Contracts.csproj" />
+  </ItemGroup>
+</Project>

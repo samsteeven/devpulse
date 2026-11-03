@@ -1,4 +1,7 @@
+using DevPulse.Contracts.Events.Monitoring;
 using DevPulse.Contracts.Internal;
+using DevPulse.Contracts.Messaging;
+using DevPulse.Messaging;
 using DevPulse.Monitoring.Application;
 using DevPulse.Monitoring.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +16,8 @@ public sealed class MonitoringDb(DbContextOptions<MonitoringDb> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.AddMessagingTables();
+
         model.Entity<MonitoredTarget>(e =>
         {
             e.ToTable("monitored_targets");
@@ -45,7 +50,7 @@ public sealed class MonitoringDbDesignTimeFactory : IDesignTimeDbContextFactory<
         .UseNpgsql("Host=design-time").UseSnakeCaseNamingConvention().Options);
 }
 
-public sealed class TargetStore(MonitoringDb db) : ITargetStore
+public sealed class TargetStore(MonitoringDb db, IOutbox outbox) : ITargetStore
 {
     public async Task SynchronizeAsync(IReadOnlyList<ActiveServiceDto> active, DateTimeOffset now, CancellationToken ct)
     {
@@ -90,10 +95,11 @@ public sealed class TargetStore(MonitoringDb db) : ITargetStore
         var target = await db.Targets.FirstOrDefaultAsync(t => t.ServiceId == serviceId, ct);
         if (target is null) return;
 
-        target.Apply(result);
+        var change = target.Apply(result);
         db.Checks.Add(HealthCheck.From(serviceId, target.OrganizationId, result));
+        MonitoringEvents.Publish(outbox, target, change, result);
 
-        // SaveChanges écrit l'état et l'historique dans une seule transaction.
+        // SaveChanges écrit l'état, l'historique et les événements dans une seule transaction.
         await db.SaveChangesAsync(ct);
     }
 
@@ -118,4 +124,65 @@ public sealed class HealthReadStore(MonitoringDb db) : IHealthReadStore
             .OrderBy(c => c.CheckedAt)
             .Select(c => new CheckPoint(c.Status, c.ResponseTimeMs, c.CheckedAt))
             .ToListAsync(ct);
+}
+
+/// <summary>Traduit un changement d'état en événements. Un seul identifiant de corrélation pour tout ce qu'une vérification déclenche.</summary>
+public static class MonitoringEvents
+{
+    public const string Producer = "monitoring-service";
+
+    public static void Publish(IOutbox outbox, MonitoredTarget target, TargetChange change, ProbeResult result, string source = MonitoringSources.Probe)
+    {
+        if (!change.StatusChanged && !change.OutageStarted && !change.OutageEnded) return;
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        string? failure = result.Failure == ProbeFailure.None ? null : result.Failure.ToString();
+
+        if (change.StatusChanged)
+            outbox.Enqueue(new ServiceStatusChangedV1
+            {
+                Producer = Producer,
+                OrganizationId = target.OrganizationId,
+                CorrelationId = correlationId,
+                ServiceId = target.ServiceId,
+                ServiceName = target.Name,
+                Environment = target.Environment,
+                PreviousStatus = change.Previous.ToString(),
+                CurrentStatus = change.Current.ToString(),
+                ResponseTimeMs = result.ResponseTimeMs,
+                HttpStatusCode = result.HttpStatusCode,
+                Failure = failure,
+                ChangedAt = result.CheckedAt,
+            });
+
+        if (change.OutageStarted)
+            outbox.Enqueue(new ServiceDownDetectedV1
+            {
+                Producer = Producer,
+                OrganizationId = target.OrganizationId,
+                CorrelationId = correlationId,
+                ServiceId = target.ServiceId,
+                ServiceName = target.Name,
+                Environment = target.Environment,
+                Source = source,
+                FailureCount = target.ConsecutiveFailures,
+                Failure = failure ?? ProbeFailure.UnexpectedStatus.ToString(),
+                LastHttpStatusCode = result.HttpStatusCode,
+                LastResponseTimeMs = result.ResponseTimeMs,
+                DetectedAt = result.CheckedAt,
+            });
+
+        if (change.EndedOutageSince is { } downSince)
+            outbox.Enqueue(new ServiceRecoveredV1
+            {
+                Producer = Producer,
+                OrganizationId = target.OrganizationId,
+                CorrelationId = correlationId,
+                ServiceId = target.ServiceId,
+                ServiceName = target.Name,
+                Environment = target.Environment,
+                DownSince = downSince,
+                RecoveredAt = result.CheckedAt,
+            });
+    }
 }

@@ -8,5 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DevPulse.Monitoring.Application\DevPulse.Monitoring.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Security\DevPulse.Security.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DevPulse.Messaging\DevPulse.Messaging.csproj" />
   </ItemGroup>
 </Project>

@@ -1,3 +1,4 @@
+using DevPulse.Messaging;
 using DevPulse.Monitoring.Infrastructure;
 using DevPulse.Observability;
 using DevPulse.Security.Authentication;
@@ -12,6 +13,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDevPulseAuthentication();
 builder.Services.AddMonitoringPersistence();
+builder.Services.AddDevPulseMessaging("monitoring-api").AddOutbox<MonitoringDb>();
 builder.Services.AddHealthChecks().AddDbContextCheck<MonitoringDb>("database", tags: ["ready"]);
 
 var app = builder.Build();

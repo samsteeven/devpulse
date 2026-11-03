@@ -16,5 +16,6 @@
     <ProjectReference Include="..\..\src\Services\Identity\DevPulse.Identity.Infrastructure\DevPulse.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Services\Registry\DevPulse.Registry.Infrastructure\DevPulse.Registry.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Services\Monitoring\DevPulse.Monitoring.Infrastructure\DevPulse.Monitoring.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\DevPulse.Messaging\DevPulse.Messaging.csproj" />
   </ItemGroup>
 </Project>

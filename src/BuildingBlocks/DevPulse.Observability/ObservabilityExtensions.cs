@@ -48,7 +48,8 @@ public static class ObservabilityExtensions
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
                 .AddHttpClientInstrumentation()
-                .AddNpgsql())
+                .AddNpgsql()
+                .AddSource("DevPulse.Messaging"))
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()

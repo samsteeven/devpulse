@@ -75,7 +75,7 @@ jobs:
 
       - name: Démarrage
         run: |
-          docker compose --profile apps up -d --wait --wait-timeout 180 postgres rabbitmq redis otel-collector
+          docker compose --profile apps up -d --wait --wait-timeout 180 postgres rabbitmq redis observability
           docker compose --profile apps up -d
           # Images sans shell : la disponibilité se vérifie de l'extérieur, par la passerelle et le front.
           for i in $(seq 1 90); do
@@ -119,6 +119,43 @@ jobs:
             done
             jq -r '"Requêtes : \(.metrics.http_reqs.count), échecs : \(.metrics.http_req_failed.value * 100) %"' tests/load/summary.json
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Les mesures produites pendant les parcours et la charge doivent être arrivées jusqu'à Prometheus et Tempo,
+      # et Grafana doit avoir chargé le tableau de bord et les règles d'alerte du dépôt.
+      - name: Supervision de la plateforme
+        run: |
+          sleep 20   # dernier envoi des métriques (toutes les 15 s)
+          names=$(curl -sf http://localhost:9090/api/v1/label/__name__/values | jq -r '.data[]')
+          missing=0
+          for metric in devpulse_checks_total devpulse_check_duration_milliseconds_bucket devpulse_outages_detected_total \
+                        devpulse_messaging_published_total devpulse_messaging_consumed_total devpulse_outbox_oldest_age_seconds \
+                        devpulse_incidents_opened_total devpulse_incidents_resolved_total \
+                        devpulse_alerts_deliveries_total devpulse_alerts_notification_latency_milliseconds_bucket \
+                        http_server_request_duration_seconds_bucket; do
+            if echo "$names" | grep -qx "$metric"; then echo "reçue : $metric"; else echo "ABSENTE : $metric"; missing=1; fi
+          done
+          echo "--- noms DevPulse vus par Prometheus"; echo "$names" | grep '^devpulse_' || true
+          p95=$(curl -sf --data-urlencode 'query=histogram_quantile(0.95, sum by (le) (devpulse_alerts_notification_latency_milliseconds_bucket))' \
+            http://localhost:9090/api/v1/query | jq -r '.data.result[0].value[1] // "aucune"')
+          echo "Délai de notification P95 (Prometheus) : $p95 ms"
+          services=$(curl -sf http://localhost:3200/api/search/tag/service.name/values | jq -r '.tagValues[]?' | sort | tr '\n' ' ')
+          echo "Services vus par Tempo : $services"
+          for service in api-gateway identity-service incident-service alerting-service monitoring-worker ai-worker; do
+            echo "$services" | grep -qw "$service" || { echo "AUCUNE TRACE : $service"; missing=1; }
+          done
+          title=$(curl -sf http://localhost:3000/api/dashboards/uid/devpulse | jq -r '.dashboard.title' || curl -sf -u admin:admin http://localhost:3000/api/dashboards/uid/devpulse | jq -r '.dashboard.title')
+          echo "Tableau de bord Grafana : $title"
+          [ "$title" = "DevPulse : plateforme" ] || missing=1
+          rules=$(curl -sf http://localhost:3000/api/v1/provisioning/alert-rules | jq -r '.[].uid' || curl -sf -u admin:admin http://localhost:3000/api/v1/provisioning/alert-rules | jq -r '.[].uid')
+          echo "Règles d'alerte chargées : $(echo $rules)"
+          [ "$(echo "$rules" | grep -c '^devpulse-')" = "5" ] || missing=1
+          {
+            echo '### Supervision'
+            echo "Délai de notification P95 mesuré par Prometheus : $p95 ms"
+            echo
+            echo "Services tracés : $services"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $missing
 
       - name: Journaux des services
         if: always()

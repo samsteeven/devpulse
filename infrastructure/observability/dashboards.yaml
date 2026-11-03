@@ -1,0 +1,11 @@
+# Fournisseur de tableaux de bord pour Grafana (image grafana/otel-lgtm) : les fichiers JSON du dossier sont chargés
+# au démarrage et relus toutes les 30 s. Les modifier dans Grafana ne les enregistre pas : éditer le JSON du dépôt.
+apiVersion: 1
+providers:
+  - name: devpulse
+    folder: DevPulse
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/custom

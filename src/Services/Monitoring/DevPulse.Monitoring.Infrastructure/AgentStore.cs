@@ -57,6 +57,7 @@ public sealed class AgentStore(MonitoringDb db, IOutbox outbox, TimeProvider clo
         Publish(agent, change, report.ReceivedAt);
 
         await db.SaveChangesAsync(ct);
+        MonitoringMetrics.RecordHeartbeat();
         return IngestOutcome.Accepted;
     }
 
@@ -93,6 +94,7 @@ public sealed class AgentStore(MonitoringDb db, IOutbox outbox, TimeProvider clo
                 Failure = change.Current == HealthStatus.Down ? "AgentSilent" : null, ChangedAt = at,
             });
 
+        if (change.OutageStarted) MonitoringMetrics.RecordOutage(MonitoringSources.Agent);
         if (change.OutageStarted)
             outbox.Enqueue(new ServiceDownDetectedV1
             {

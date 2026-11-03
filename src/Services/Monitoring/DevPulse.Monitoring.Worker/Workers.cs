@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using DevPulse.Monitoring.Application;
+using DevPulse.Monitoring.Infrastructure;
 using Microsoft.Extensions.Options;
 
 namespace DevPulse.Monitoring.Worker;
@@ -96,6 +97,7 @@ public sealed class CheckSchedulerService(
                 try
                 {
                     var result = await prober.ProbeAsync(assignment.TargetUrl, assignment.Timeout, stoppingToken);
+                    MonitoringMetrics.RecordCheck(result);
 
                     await using var scope = scopes.CreateAsyncScope();
                     await scope.ServiceProvider.GetRequiredService<ITargetStore>().RecordAsync(assignment.ServiceId, result, stoppingToken);

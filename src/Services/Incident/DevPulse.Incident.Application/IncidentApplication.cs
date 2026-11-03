@@ -111,9 +111,10 @@ public sealed class IncidentService(IIncidentRepository repository, IOutbox outb
         var incident = await repository.FindAsync(organizationId, id, ct);
         if (incident is null) return null;
 
-        if (incident.Resolve(actor, note, clock.GetUtcNow()))
-            outbox.Enqueue(IncidentEvents.Resolved(incident, Guid.NewGuid().ToString("N"), null));
+        var resolved = incident.Resolve(actor, note, clock.GetUtcNow());
+        if (resolved) outbox.Enqueue(IncidentEvents.Resolved(incident, Guid.NewGuid().ToString("N"), null));
         await repository.SaveAsync(ct);
+        if (resolved) IncidentMetrics.RecordResolved(incident);
         return ToDetails(incident, clock.GetUtcNow());
     }
 
@@ -157,6 +158,8 @@ public sealed class ServiceDownDetectedHandler(IIncidentRepository repository, I
             e.LastHttpStatusCode, e.LastResponseTimeMs, e.DetectedAt), clock.GetUtcNow());
         repository.Add(incident);
         outbox.Enqueue(IncidentEvents.Created(incident, e.CorrelationId, e.EventId.ToString()));
+        // Compté avant la validation, faite par le consommateur : un échec suivi d'une reprise peut compter deux fois.
+        IncidentMetrics.RecordOpened(incident);
         logger.LogInformation("Incident {IncidentId} ouvert pour {ServiceName}", incident.Id, e.ServiceName);
     }
 }
@@ -173,6 +176,7 @@ public sealed class ServiceRecoveredHandler(IIncidentRepository repository, IOut
         if (incident is null || !incident.ResolveAutomatically(e.RecoveredAt)) return;
 
         outbox.Enqueue(IncidentEvents.Resolved(incident, e.CorrelationId, e.EventId.ToString()));
+        IncidentMetrics.RecordResolved(incident);
         logger.LogInformation("Incident {IncidentId} clos automatiquement", incident.Id);
     }
 }

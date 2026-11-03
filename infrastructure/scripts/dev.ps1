@@ -45,6 +45,7 @@ $common = @{
     DOTNET_ENVIRONMENT          = 'Development'
     Jwt__PublicKey              = $dotenv.JWT_PUBLIC_KEY
     OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4317'
+    OTEL_METRIC_EXPORT_INTERVAL = '15000'
     RabbitMq__Host              = 'localhost'
     RabbitMq__User              = $dotenv.RABBITMQ_USER
     RabbitMq__Password          = $dotenv.RABBITMQ_PASSWORD

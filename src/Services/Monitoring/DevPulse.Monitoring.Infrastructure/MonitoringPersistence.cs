@@ -182,6 +182,7 @@ public static class MonitoringEvents
                 ChangedAt = result.CheckedAt,
             });
 
+        if (change.OutageStarted) MonitoringMetrics.RecordOutage(source);
         if (change.OutageStarted)
             outbox.Enqueue(new ServiceDownDetectedV1
             {

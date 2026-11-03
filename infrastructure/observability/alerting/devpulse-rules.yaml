@@ -1,0 +1,174 @@
+# Règles d'alerte Grafana sur la plateforme elle-même (qui surveille le surveillant ?).
+# Chargées au démarrage par l'image grafana/otel-lgtm ; source de données Prometheus (uid « prometheus »).
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: "devpulse"
+    folder: "DevPulse"
+    interval: "1m"
+    rules:
+      - uid: "devpulse-checks-stopped"
+        title: "Plus aucune vérification"
+        condition: "B"
+        for: "1m"
+        noDataState: "OK"
+        execErrState: "Error"
+        labels:
+          severity: "critical"
+          service: "devpulse"
+        annotations:
+          summary: "Le worker de monitoring ne vérifie plus rien depuis 3 minutes alors qu'il en faisait : plus rien n'est surveillé."
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              refId: "A"
+              expr: "(sum(increase(devpulse_checks_total[3m])) or vector(0)) and on() (count(devpulse_checks_total) > 0)"
+              instant: true
+              range: false
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "threshold"
+              expression: "A"
+              conditions:
+                - evaluator:
+                    type: "lt"
+                    params:
+                      - 1
+      - uid: "devpulse-dead-letters"
+        title: "Message en file morte"
+        condition: "B"
+        for: "0m"
+        noDataState: "OK"
+        execErrState: "Error"
+        labels:
+          severity: "critical"
+          service: "devpulse"
+        annotations:
+          summary: "Un événement a échoué après toutes ses reprises : un incident, une alerte ou une analyse manque. Voir les files .dlq dans RabbitMQ."
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              refId: "A"
+              expr: "sum(increase(devpulse_messaging_consumed_total{outcome=\"dead_lettered\"}[10m])) or vector(0)"
+              instant: true
+              range: false
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "threshold"
+              expression: "A"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+      - uid: "devpulse-outbox-stuck"
+        title: "Outbox en retard"
+        condition: "B"
+        for: "2m"
+        noDataState: "OK"
+        execErrState: "Error"
+        labels:
+          severity: "critical"
+          service: "devpulse"
+        annotations:
+          summary: "Un événement attend sa publication depuis plus d'une minute : le courtier est probablement injoignable."
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              refId: "A"
+              expr: "max(devpulse_outbox_oldest_age_seconds) or vector(0)"
+              instant: true
+              range: false
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "threshold"
+              expression: "A"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 60
+      - uid: "devpulse-notification-slow"
+        title: "Délai de notification au-dessus de 10 s"
+        condition: "B"
+        for: "0m"
+        noDataState: "OK"
+        execErrState: "Error"
+        labels:
+          severity: "warning"
+          service: "devpulse"
+        annotations:
+          summary: "95 % des alertes devraient arriver en moins de 10 s après le fait signalé ; ce n'est plus le cas sur 15 minutes."
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              refId: "A"
+              expr: "histogram_quantile(0.95, sum by (le) (rate(devpulse_alerts_notification_latency_milliseconds_bucket[15m])))"
+              instant: true
+              range: false
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "threshold"
+              expression: "A"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 10000
+      - uid: "devpulse-alerts-failed"
+        title: "Alertes abandonnées"
+        condition: "B"
+        for: "0m"
+        noDataState: "OK"
+        execErrState: "Error"
+        labels:
+          severity: "critical"
+          service: "devpulse"
+        annotations:
+          summary: "Un envoi d'alerte a échoué cinq fois : le destinataire n'a pas été prévenu."
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 1800
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              refId: "A"
+              expr: "sum(increase(devpulse_alerts_deliveries_total{outcome=\"failed\"}[15m])) or vector(0)"
+              instant: true
+              range: false
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "threshold"
+              expression: "A"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0

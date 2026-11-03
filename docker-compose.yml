@@ -10,7 +10,9 @@ x-app-env: &app-env
   RabbitMq__Host: rabbitmq
   RabbitMq__User: ${RABBITMQ_USER:-devpulse}
   RabbitMq__Password: ${RABBITMQ_PASSWORD}
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://observability:4317
+  # Métriques envoyées toutes les 15 s (60 s par défaut) : les tableaux de bord suivent sans attendre une minute.
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
   # La cible de démonstration est sur le réseau Docker : autorisé ici, jamais en production.
   TargetPolicy__AllowPrivateTargets: ${ALLOW_PRIVATE_TARGETS:-false}
   # Le cookie Secure n'est pas renvoyé sur http://127.0.0.1 par tous les navigateurs ; en local seulement.
@@ -75,16 +77,27 @@ services:
       timeout: 5s
       retries: 10
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.164.0
-    container_name: devpulse-otel
+  # Traces, métriques et journaux de DevPulse lui-même : collecteur OpenTelemetry, Prometheus, Tempo, Loki et Grafana
+  # dans une image (http://localhost:3000). Données en mémoire : rien n'est écrit dans le disque virtuel de Docker,
+  # l'historique repart de zéro à chaque redémarrage.
+  observability:
+    image: grafana/otel-lgtm:0.37.0
+    container_name: devpulse-observability
     restart: unless-stopped
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/custom/devpulse.json
+    tmpfs:
+      - /data:rw,mode=1777,size=1g
     volumes:
-      - ./infrastructure/docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./infrastructure/observability/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/custom:ro
+      - ./infrastructure/observability/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
+      - ./infrastructure/observability/alerting:/otel-lgtm/grafana/conf/provisioning/alerting:ro
     ports:
-      - "127.0.0.1:4317:4317"
-      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:3000:3000"   # Grafana
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:9090:9090"   # Prometheus
+      - "127.0.0.1:3200:3200"   # Tempo
 
   # --- Applications (profil « apps ») : docker compose --profile apps up -d --build ---------------------------
   # Les images n'ont pas de shell (chiseled) : pas de healthcheck interne. La CI attend la passerelle de l'extérieur.

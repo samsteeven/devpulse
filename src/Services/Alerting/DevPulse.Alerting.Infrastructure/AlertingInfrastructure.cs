@@ -232,6 +232,8 @@ public sealed class DeliveryDispatcher(
 
             await db.SaveChangesAsync(CancellationToken.None);
             await transaction.CommitAsync(CancellationToken.None);
+            // Après validation : une mesure ne doit pas compter un envoi dont l'état n'a pas été enregistré.
+            foreach (var delivery in due) AlertingMetrics.RecordAttempt(delivery, channels[delivery.ChannelId].Kind);
             return due.Count;
         }
     }

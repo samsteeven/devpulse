@@ -26,6 +26,10 @@ public sealed class OutboxDispatcher<TDb>(
         var settings = options.Value;
         if (!settings.Enabled) return;
 
+        // Boucle à part : quand le courtier est injoignable, la publication attend la connexion, et c'est justement
+        // là que l'âge de l'outbox doit continuer de grandir sur les tableaux de bord.
+        var gauges = GaugeLoopAsync(stoppingToken);
+
         IChannel? channel = null;
         try
         {
@@ -59,6 +63,7 @@ public sealed class OutboxDispatcher<TDb>(
         finally
         {
             if (channel is not null) await channel.DisposeAsync();
+            await gauges;
         }
     }
 
@@ -100,11 +105,13 @@ public sealed class OutboxDispatcher<TDb>(
                     await Publisher.PublishAsync(channel, EventTopology.Exchange, message.RoutingKey, message.Id, message.EventType,
                         message.CorrelationId, message.OccurredAt, message.Payload, message.TraceParent, ct);
                     message.MarkPublished(clock.GetUtcNow());
+                    MessagingMetrics.Published.Add(1, MessagingMetrics.Tag("routing_key", message.RoutingKey));
                     published++;
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     message.MarkFailed($"{e.GetType().Name}: {e.Message}", clock.GetUtcNow());
+                    MessagingMetrics.PublishFailures.Add(1, MessagingMetrics.Tag("routing_key", message.RoutingKey));
                     logger.LogWarning(e, "Événement {EventId} ({RoutingKey}) non publié, tentative {Attempts}", message.Id, message.RoutingKey, message.Attempts);
                     if (!channel.IsOpen) break; // les suivants échoueraient de la même façon
                 }
@@ -115,6 +122,41 @@ public sealed class OutboxDispatcher<TDb>(
             if (published > 0) logger.LogDebug("{Count} événement(s) publié(s)", published);
             return due.Count;
         }
+    }
+
+    /// <summary>Taille et âge de l'outbox, relus toutes les 10 s pour les jauges (requêtes exclues des traces).</summary>
+    private async Task GaugeLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    await RefreshGaugeAsync(ct);
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    logger.LogDebug(e, "Lecture de l'outbox pour les jauges impossible");
+                }
+                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshGaugeAsync(CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        using var _ = SuppressInstrumentationScope.Begin();
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TDb>();
+        var pending = db.Set<OutboxMessage>().Where(m => m.PublishedAt == null);
+        var count = await pending.LongCountAsync(ct);
+        var oldest = count == 0 ? (DateTimeOffset?)null : await pending.MinAsync(m => (DateTimeOffset?)m.OccurredAt, ct);
+        MessagingMetrics.ReportOutbox(typeof(TDb).Name, count, oldest is { } at ? Math.Max(0, (now - at).TotalSeconds) : 0);
     }
 
     private async Task CleanupAsync(CancellationToken ct)

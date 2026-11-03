@@ -77,6 +77,7 @@ public sealed class QueueConsumer(
             if (!registration.Routes.TryGetValue(routingKey, out var route))
             {
                 await DeadLetterAsync(channel, publish, delivery, body, attempt, $"Aucun traitement pour {routingKey}", ct);
+                Count("dead_lettered");
                 return;
             }
 
@@ -95,6 +96,7 @@ public sealed class QueueConsumer(
             if (integrationEvent is null)
             {
                 await DeadLetterAsync(channel, publish, delivery, body, attempt, "Message illisible", ct);
+                Count("dead_lettered");
                 return;
             }
 
@@ -104,10 +106,14 @@ public sealed class QueueConsumer(
                 ["EventId"] = integrationEvent.EventId,
             });
 
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
-                await ProcessAsync(route, integrationEvent, publish, ct);
+                var processed = await ProcessAsync(route, integrationEvent, publish, ct);
                 await channel.BasicAckAsync(delivery.DeliveryTag, false, ct);
+                MessagingMetrics.ProcessingDuration.Record(System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+                    MessagingMetrics.Tag("queue", registration.Queue));
+                Count(processed ? "processed" : "duplicate");
             }
             catch (Exception e) when (!ct.IsCancellationRequested)
             {
@@ -116,12 +122,14 @@ public sealed class QueueConsumer(
                 {
                     logger.LogError(e, "Événement {EventId} en échec après {Attempt} tentative(s) : file morte", integrationEvent.EventId, attempt);
                     await DeadLetterAsync(channel, publish, delivery, body, attempt, $"{e.GetType().Name}: {e.Message}", ct);
+                    Count("dead_lettered");
                 }
                 else
                 {
                     logger.LogWarning(e, "Événement {EventId} en échec (tentative {Attempt}) ; reprise dans {Delay} s",
                         integrationEvent.EventId, attempt, settings.RetryDelaySeconds);
                     await RepublishAsync(channel, publish, delivery, body, Topology.RetryQueue(registration.Queue), attempt + 1, null, ct);
+                    Count("retried");
                 }
             }
         }
@@ -137,7 +145,11 @@ public sealed class QueueConsumer(
         }
     }
 
-    private async Task ProcessAsync(EventRoute route, IntegrationEvent integrationEvent, IChannel publish, CancellationToken ct)
+    private void Count(string outcome) => MessagingMetrics.Consumed.Add(1,
+        MessagingMetrics.Tag("queue", registration.Queue), MessagingMetrics.Tag("outcome", outcome));
+
+    /// <summary>Faux si l'événement avait déjà été traité (doublon acquitté sans effet).</summary>
+    private async Task<bool> ProcessAsync(EventRoute route, IntegrationEvent integrationEvent, IChannel publish, CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
@@ -149,7 +161,7 @@ public sealed class QueueConsumer(
             foreach (var pending in services.GetRequiredService<BufferedOutbox>().Pending)
                 await Publisher.PublishAsync(publish, EventTopology.Exchange, pending.RoutingKey, pending.EventId, pending.EventType,
                     pending.CorrelationId, pending.OccurredAt, EventSerializer.Serialize(pending), Activity.Current?.Id, ct);
-            return;
+            return true;
         }
 
         var db = (DbContext)services.GetRequiredService(registration.DbContextType);
@@ -163,7 +175,7 @@ public sealed class QueueConsumer(
         catch (DbUpdateException e) when (DbErrors.IsUniqueViolation(e))
         {
             logger.LogInformation("Événement {EventId} déjà traité par {Queue} : ignoré", integrationEvent.EventId, registration.Queue);
-            return;
+            return false;
         }
 
         await route.Invoke(services, integrationEvent, ct);
@@ -172,6 +184,7 @@ public sealed class QueueConsumer(
 
         // Les événements écrits par ce traitement peuvent partir tout de suite.
         services.GetRequiredService<OutboxSignal>().Notify();
+        return true;
     }
 
     private async Task DeadLetterAsync(IChannel channel, IChannel publish, BasicDeliverEventArgs delivery, byte[] body, int attempt, string error, CancellationToken ct) =>

@@ -107,7 +107,8 @@ jobs:
 
       - name: Charge (k6)
         run: |
-          docker run --rm --network host -e GATEWAY_URL=http://localhost:8080 -e DEMO_TARGET_URL=http://demo:8080 \
+          # Même utilisateur que le runner : k6 doit pouvoir écrire son résumé dans le dossier monté.
+          docker run --rm --network host --user "$(id -u):$(id -g)" -e GATEWAY_URL=http://localhost:8080 -e DEMO_TARGET_URL=http://demo:8080 \
             -v "$PWD/tests/load:/scripts" grafana/k6:1.8.1 run --summary-export /scripts/summary.json /scripts/dashboard.js
           {
             echo '### Charge : 20 utilisateurs, 30 s, sur le runner GitHub'

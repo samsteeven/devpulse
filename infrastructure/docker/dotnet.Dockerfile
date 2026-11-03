@@ -6,12 +6,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.403-noble AS build
 WORKDIR /src
 ARG PROJECT
 
-# Fichiers de projet d'abord : la restauration reste en cache tant qu'aucune dépendance ne change.
+# Cache NuGet partagé entre les images construites en parallèle : « locked », sinon deux restaurations
+# extraient le même paquet en même temps et l'une échoue (constaté en CI).
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ src/
 COPY infrastructure/demo/ infrastructure/demo/
-RUN --mount=type=cache,target=/root/.nuget/packages dotnet restore "$PROJECT"
-RUN --mount=type=cache,target=/root/.nuget/packages \
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked dotnet restore "$PROJECT"
+RUN --mount=type=cache,target=/root/.nuget/packages,sharing=locked \
     dotnet publish "$PROJECT" -c Release -o /app --no-restore \
     && mv "/app/$(basename "$PROJECT")" /app/service
 

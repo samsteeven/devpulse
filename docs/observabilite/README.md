@@ -39,7 +39,11 @@ Dans Prometheus, les points deviennent des soulignés, et l'unité ou `_total` s
 - **Grafana** : http://localhost:3000, tableau de bord « DevPulse : plateforme » à l'ouverture (vérifications, incidents et alertes, messagerie, services HTTP). Traces : Explore > Tempo ; journaux : Explore > Loki.
 - **Données en mémoire** (`tmpfs`, 1 Go) : rien n'est écrit dans le disque virtuel de Docker, l'historique repart de zéro à chaque redémarrage.
 - **Fichiers versionnés** dans [`infrastructure/observability`](../../infrastructure/observability) : le tableau de bord (`dashboards/devpulse.json`) et les règles (`alerting/devpulse-rules.yaml`). Une modification faite dans Grafana n'est pas enregistrée : éditer le fichier.
-- Les services envoient leurs métriques toutes les 15 s (`OTEL_METRIC_EXPORT_INTERVAL`).
+- Les services envoient leurs métriques toutes les 15 s (`OTEL_METRIC_EXPORT_INTERVAL`) : un événement met jusqu'à une demi-minute à apparaître dans les panneaux.
+- **`tmpfs` monté avec `exec`** : Grafana 13 met à jour son extension Prometheus dans `/data` au démarrage, puis l'exécute. En `noexec` (le défaut d'un `tmpfs`), tous les panneaux affichent « Datasource prometheus was not found ».
+- **Totaux par différence.** Un compteur qui apparaît arrive déjà à 1 et `increase()` ne voit pas cette première hausse : les nombres d'événements (pannes, incidents, files mortes, envois abandonnés) se calculent en `sum(x) - (sum(x offset 24h) or vector(0))`, arrondis. Prometheus insère aussi un zéro au début de chaque série (`--enable-feature=created-timestamp-zero-ingestion`), ce qui corrige les taux.
+
+![Tableau de bord Grafana après deux pannes de démonstration](../screenshots/vitrine-grafana.png)
 
 ## Règles d'alerte
 

@@ -2,7 +2,13 @@
 
 Plateforme multi-organisations d'observabilité, en microservices **ASP.NET Core 10** et **Vue 3**. Une équipe enregistre ses API, DevPulse les sonde (ou reçoit les battements d'un agent installé chez elle), ouvre un incident quand une panne est confirmée, prévient par webhook ou Slack, propose une analyse et ferme l'incident au retour du service.
 
-![Détail d'un incident résolu](docs/screenshots/incident-detail.png)
+![Tableau de bord : six services, un en panne avec son incident pris en charge, un dégradé](docs/screenshots/vitrine-tableau-de-bord.png)
+
+| Incident : analyse et chronologie | Alertes : envois et délais | Supervision de la plateforme (Grafana) |
+|---|---|---|
+| ![Détail d'un incident](docs/screenshots/vitrine-incident.png) | ![Envois d'alertes](docs/screenshots/vitrine-alertes.png) | ![Tableau de bord Grafana](docs/screenshots/vitrine-grafana.png) |
+
+Captures produites avec des données de démonstration par le workflow manuel « Captures d'écran » (`npm run captures` dans `tests/DevPulse.E2ETests`) : toute la plateforme démarrée à partir des images, deux pannes réelles de la fausse API.
 
 ## Ce qui est vérifié, et ce qui ne l'est pas
 
@@ -122,6 +128,8 @@ Non testés automatiquement : les services d'arrière-plan du worker (planificat
 - **Port 5432 refusé par Windows**, sans cause établie : le port publié se règle dans `.env` (5433 par défaut).
 - **Serilog et le journal par défaut** écrivaient chaque ligne deux fois ; les refus métier étaient journalisés comme des erreurs.
 - **EF Core en deux versions** (Npgsql tire la 10.0.4) : épinglage transitif de la gestion centrale des paquets.
+- **Grafana 13 et un `tmpfs` en `noexec`.** Au démarrage, Grafana met à jour son extension Prometheus dans `/data` puis l'exécute : refusé, d'où « Datasource prometheus was not found » sur tous les panneaux. Le `tmpfs` est monté avec `exec`, et la CI interroge maintenant Grafana lui-même, pas seulement Prometheus.
+- **Un compteur qui apparaît arrive déjà à 1** : `increase()` ne voit pas cette première hausse. Le premier incident affichait 0, et la première mise en file morte n'aurait déclenché aucune alerte. Les totaux se calculent par différence avec la valeur passée.
 
 ## Limites
 

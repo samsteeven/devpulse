@@ -130,7 +130,8 @@ const promValue = async (expr) => {
 }
 await until('métriques dans Prometheus', async () =>
   (await promValue('sum(devpulse_incidents_opened_total)')) >= 2 && (await promValue('sum(devpulse_outages_detected_total)')) >= 2)
-await sleep(20_000) // un ou deux points de plus pour les courbes
+// Les panneaux interrogent une plage par pas réguliers : le dernier pas doit tomber après l'arrivée des valeurs.
+await sleep(45_000)
 
 // Grafana : le tableau de bord de la plateforme, sur les 5 dernières minutes, sans l'habillage de l'interface.
 const grafana = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })

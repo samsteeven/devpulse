@@ -11,7 +11,7 @@ Les huit premières viennent du cahier des charges (Technical Blueprint v1.0). L
 | 005 | Monitoring hybride : sondes HTTP et agent | L'agent demande une identité, une révocation, des collecteurs par système | Fait ([ADR-014](#adr-014--lagent-parle-à-monitoring-pas-au-collecteur-opentelemetry)) |
 | 006 | OpenTelemetry et Serilog | Un collecteur à exploiter | Fait en local, sans stockage |
 | 007 | IA derrière `IAIAnalysisProvider`, sans action automatique | Données à filtrer avant l'envoi | Fait ([ADR-015](#adr-015--deux-fournisseurs-danalyse-règles-locales-et-api-compatible-openai)) |
-| 008 | ECS Fargate sur AWS, déployé avec Terraform | Coût des services managés | Terraform écrit et validé en CI, **jamais appliqué** |
+| 008 | ECS Fargate sur AWS, déployé avec Terraform | Coût des services managés | Terraform écrit et validé en CI, **jamais appliqué** ; seconde cible Azure ([ADR-017](#adr-017--azure-container-apps-comme-seconde-cible-de-déploiement)) |
 
 ## ADR-009 : RabbitMQ.Client plutôt que MassTransit
 
@@ -100,3 +100,30 @@ Les huit premières viennent du cahier des charges (Technical Blueprint v1.0). L
 **Décision.** Le jeton d'accès (15 min) ne vit qu'en mémoire dans le navigateur. Le jeton de renouvellement (14 jours) est opaque, en cookie `HttpOnly`, `Secure`, `SameSite=Strict`, limité au chemin `/api/auth`, et stocké par empreinte. Chaque usage le remplace ; présenter un jeton déjà remplacé révoque toute sa famille. Les routes qui lisent ce cookie exigent un en-tête que seul un script de la même origine peut poser.
 
 **Conséquences.** Un script injecté ne trouve aucun jeton dans le stockage du navigateur ; il peut encore agir pendant que la page est ouverte, ce qu'aucun stockage ne protège. Retirer un membre ou changer son rôle révoque ses sessions, mais un jeton d'accès déjà émis reste valable jusqu'à 15 minutes.
+
+## ADR-017 : Azure Container Apps comme seconde cible de déploiement
+
+**État : accepté, Terraform écrit (`infrastructure/terraform-azure`), jamais appliqué.**
+
+**Contexte.** Le compte disponible pour une vraie démonstration est un abonnement Azure for Students : environ 100 $ de crédit, sans carte bancaire, et une stratégie Azure qui limite les déploiements à quelques régions propres à chaque abonnement. Le Terraform AWS (ADR-008) reste valable, mais aucun compte AWS n'est disponible pour l'appliquer.
+
+**Décision.** Une seconde cible, sur Azure Container Apps (plan Consommation), décrite séparément :
+
+| AWS (ADR-008) | Azure | Raison |
+|---|---|---|
+| ECS Fargate | Container Apps | Mise à zéro des applications sans état, quota mensuel gratuit, sondes HTTP sans outil dans l'image |
+| ALB | Entrée HTTPS de Container Apps | Certificat géré inclus, pas de répartiteur à payer |
+| Cloud Map | Noms internes de l'environnement | Inclus |
+| ECR | GitHub Container Registry | Gratuit pour un dépôt public ; publication par le workflow manuel « Publier les images » |
+| RDS PostgreSQL | PostgreSQL Flexible Server (B1ms), accès privé | Même moteur, même chaîne de connexion |
+| Amazon MQ | RabbitMQ en conteneur, ou un courtier externe | Azure n'a pas de RabbitMQ géré ; Service Bus demanderait un second transport |
+| ElastiCache | Facultatif, désactivé par défaut | Une seule instance d'Alerting n'a pas besoin de fond de panier SignalR |
+| Secrets Manager | Secrets de Container Apps | Gratuit ; Key Vault et identité managée en production |
+| — | Budget avec alertes, plafond quotidien des journaux | Le crédit étudiant ne doit pas s'épuiser sans prévenir |
+
+**Conséquences.**
+
+- Le code ne change pas : les services lisent la même configuration. Seul le nginx du front a été corrigé pour envoyer à la passerelle son propre en-tête `Host`, que l'entrée interne de Container Apps utilise pour aiguiller.
+- RabbitMQ en conteneur n'a pas de stockage durable : un redémarrage perd les messages déjà en file. L'outbox ne protège que les événements pas encore confirmés par le courtier. Acceptable pour une démonstration, pas en production.
+- Les API mises à zéro publient leurs événements à leur réveil : ils restent en base d'ici là. Incident et Alerting gardent une instance, car ils consomment des files.
+- La région n'a pas de valeur par défaut : elle doit faire partie des régions autorisées de l'abonnement.

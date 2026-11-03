@@ -4,13 +4,14 @@
 // Environ 5 minutes : il faut laisser le temps à deux pannes d'être confirmées, puis à la supervision d'accumuler des points.
 import { chromium } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
 const WEB = process.env.BASE_URL ?? 'http://localhost:5173'
 const GATEWAY = process.env.GATEWAY_URL ?? 'http://localhost:8080'
 const DEMO = process.env.DEMO_URL ?? 'http://localhost:5020'
 const DEMO_TARGET = process.env.DEMO_TARGET_URL ?? DEMO
 const GRAFANA = process.env.GRAFANA_URL ?? 'http://localhost:3000'
-const OUT = new URL('../../../docs/screenshots/', import.meta.url)
+const OUT = fileURLToPath(new URL('../../../docs/screenshots/', import.meta.url))
 
 const suffix = Date.now().toString(36).slice(-4)
 const account = { email: `samen+${suffix}@atelier-nova.example`, password: 'demo-atelier-nova-2026', organizationName: 'Atelier Nova' }
@@ -105,19 +106,19 @@ await page.waitForURL(`${WEB}/`)
 await page.getByTestId('active-incidents').waitFor()
 await page.locator('[data-status="Degraded"]').first().waitFor()
 await sleep(1500)
-await page.screenshot({ path: new URL('vitrine-tableau-de-bord.png', OUT) })
+await page.screenshot({ path: OUT + 'vitrine-tableau-de-bord.png' })
 log('Capture : tableau de bord')
 
 await page.goto(`${WEB}/incidents/${incident.id}`)
 await page.getByTestId('analysis').getByText('Causes probables').waitFor()
 await sleep(1000)
-await page.screenshot({ path: new URL('vitrine-incident.png', OUT), fullPage: true })
+await page.screenshot({ path: OUT + 'vitrine-incident.png', fullPage: true })
 log('Capture : incident')
 
 await page.goto(`${WEB}/alerts`)
 await page.getByTestId('delivery-row').first().waitFor()
 await sleep(1000)
-await page.screenshot({ path: new URL('vitrine-alertes.png', OUT), fullPage: true })
+await page.screenshot({ path: OUT + 'vitrine-alertes.png', fullPage: true })
 log('Capture : alertes')
 
 // Grafana : le tableau de bord de la plateforme, sur les 20 dernières minutes, sans l'habillage de l'interface.
@@ -132,9 +133,9 @@ if (g.url().includes('/login')) {
 }
 await g.getByText('Vérifications par minute').waitFor()
 await sleep(8000) // rendu des panneaux
-await g.screenshot({ path: new URL('vitrine-grafana.png', OUT) })
+await g.screenshot({ path: OUT + 'vitrine-grafana.png' })
 log('Capture : Grafana')
 
 await browser.close()
 await setMode('ok')
-log(`Terminé : ${new URL('.', OUT).pathname}`)
+log(`Terminé : ${OUT}`)

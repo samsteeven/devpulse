@@ -92,7 +92,8 @@ async function copy() {
 
   <p v-if="memberError" class="mb-4 rounded-md border border-bad/40 bg-bad/10 p-3 text-sm text-bad" role="alert">{{ errorMessage(memberError) }}</p>
 
-  <div class="overflow-x-auto rounded-lg border border-line bg-surface">
+  <!-- relative : sans cela, le texte réservé aux lecteurs d'écran (position absolue) sort du cadre défilant et élargit toute la page. -->
+  <div class="relative overflow-x-auto rounded-lg border border-line bg-surface">
     <table class="w-full min-w-[560px] text-sm">
       <thead class="border-b border-line text-left text-muted">
         <tr>
